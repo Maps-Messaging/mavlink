@@ -31,7 +31,7 @@ public class MavlinkPayloadPacker {
     List<MavlinkCompiledField> compiledFields = compiledMessage.getCompiledFields();
 
     int lastExtensionIndex = findLastIncludedExtensionIndex(compiledFields, values);
-    int payloadSize = computePayloadSize(compiledFields, lastExtensionIndex);
+    int payloadSize = computeTotalPotentialPayloadSize(compiledFields);
 
     if (payloadSize <= 0) {
       throw new IOException("Computed MAVLink payload size is 0 for message id: " + messageId +
@@ -41,10 +41,6 @@ public class MavlinkPayloadPacker {
     ByteBuffer buffer = allocate(payloadSize);
     encodePayload(compiledFields, lastExtensionIndex, values, buffer);
 
-    if (buffer.position() != payloadSize) {
-      throw new IOException("Packed MAVLink payload size mismatch for message id: " + messageId +
-          " expected=" + payloadSize + " actual=" + buffer.position());
-    }
 
     return buffer.array();
   }
@@ -93,6 +89,14 @@ public class MavlinkPayloadPacker {
     return size;
   }
 
+  private int computeTotalPotentialPayloadSize(List<MavlinkCompiledField> compiledFields) {
+    int size = 0;
+    for (MavlinkCompiledField compiledField : compiledFields) {
+      size += compiledField.getSizeInBytes();
+    }
+    return size;
+  }
+
   private ByteBuffer allocate(int payloadSize) {
     ByteBuffer buffer = ByteBuffer.allocate(payloadSize);
     buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -136,6 +140,7 @@ public class MavlinkPayloadPacker {
     try {
       compiledField.getFieldCodec().encode(buffer, value);
     } catch (Exception e) {
+      e.printStackTrace();
       throw new IOException("Failed to encode field '" + compiledField.getFieldDefinition().getName() +
           "' with value type " + value.getClass().getName(), e);
     }

@@ -34,7 +34,9 @@ public final class MavlinkFieldCodecFactory {
       String lengthText = typeString.substring(arrayStart + 1, typeString.length() - 1);
       arrayLength = Integer.parseInt(lengthText);
     }
-
+    if(fieldDefinition.isArray()){
+      arrayLength = fieldDefinition.getArrayLength();
+    }
     AbstractMavlinkFieldCodec scalarCodec = createScalarCodec(baseType);
 
     if (arrayLength > 0) {

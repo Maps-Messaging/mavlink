@@ -93,10 +93,8 @@ public class MavlinkPayloadParser {
       if (fieldDefinition.getWireType() == MavlinkWireType.CHAR) {
         // MAVLink strings: fixed-size, null-terminated, null-padded
         byte[] bytes = new byte[len];
-        for (int i = 0; i < len; i++) {
-          Object v = fieldCodec.decode(buffer);   // codec returns Byte
-          bytes[i] = (byte) v;
-        }
+        String v = (String) fieldCodec.decode(buffer);   // codec returns Byte
+        bytes = v.getBytes(StandardCharsets.UTF_8);
         int end = len;
         while (end > 0 && bytes[end - 1] == 0) {
           end--;
