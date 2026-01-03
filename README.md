@@ -1,23 +1,33 @@
 # MAVLink Payload Codec (Java)
 
-This repository provides a lightweight, schema-driven MAVLink payload
+This repository provides a lightweight, schema-driven MAVLink **payload**
 encoder and decoder for Java.
 
-It parses MAVLink XML dialects (including `<include>` handling), compiles
-message definitions, and provides fast, thread-safe encoding and decoding
-of MAVLink message **payloads**.
+It parses MAVLink XML dialects (including `{@code <include>}` handling),
+compiles message definitions, and provides fast, thread-safe encoding and
+decoding of MAVLink message **payloads only**.
 
-This library is intentionally limited in scope.
+This library is intentionally limited in scope and designed to be composed
+into larger MAVLink-capable systems.
 
+---
 
-## Scope (Important)
+## Scope (Read This First)
 
 This library operates **only on MAVLink message payloads**.
 
-It does **not**:
+It **does**:
+
+- Parse MAVLink XML dialects
+- Compile message definitions into an immutable registry
+- Encode Java field maps into MAVLink payload bytes
+- Decode MAVLink payload bytes into typed field maps
+- Correctly handle MAVLink field ordering, arrays, enums, and extensions
+
+It **does not**:
 
 - Parse or generate MAVLink v1/v2 frames
-- Handle headers, CRCs, signing, or message framing
+- Handle headers, CRCs, signing, or framing
 - Manage system IDs, component IDs, or sequence numbers
 - Implement any transport (UART, UDP, TCP, etc.)
 
@@ -25,10 +35,11 @@ If you need a full MAVLink stack, this library is not it.
 
 This library is designed to sit **under** a framing and transport layer.
 
+---
 
 ## Features
 
-- MAVLink XML dialect parsing with `<include>` support
+- MAVLink XML dialect parsing with `{@code <include>}` support
 - Canonical dialect compilation (e.g. `common.xml`)
 - Immutable, thread-safe compiled registries
 - Correct MAVLink field ordering and packing rules
@@ -38,6 +49,7 @@ This library is designed to sit **under** a framing and transport layer.
 - Safe failure on invalid or truncated payloads
 - No shared mutable state at runtime
 
+---
 
 ## Getting Started
 
@@ -51,6 +63,9 @@ MavlinkCodec codec =
     loader.getDialectOrThrow("common");
 ```
 
+The built-in `common` dialect is loaded eagerly and is always available.
+
+---
 
 ## Encoding a Payload
 
@@ -70,6 +85,7 @@ Map<String, Object> values = Map.of(
 byte[] payload = codec.encodePayload(1, values);
 ```
 
+---
 
 ## Decoding a Payload
 
@@ -80,6 +96,10 @@ Map<String, Object> decoded =
 int load = (int) decoded.get("load");
 ```
 
+Field values are returned using standard Java types based on the MAVLink
+message definition.
+
+---
 
 ## Loading Custom Dialects
 
@@ -92,8 +112,11 @@ try (InputStream xml = Files.newInputStream(Path.of("custom.xml"))) {
 }
 ```
 
-Dialects are compiled once and cached by name.
+- Dialects are compiled once
+- Compiled codecs are cached by name
+- Subsequent lookups are lock-free
 
+---
 
 ## Thread Safety
 
@@ -107,16 +130,20 @@ A single codec instance may be safely:
 - Cached globally
 - Used in high-throughput systems
 
+---
 
 ## Error Handling
 
-- Unknown message IDs result in `IOException`
-- Invalid field types result in `IOException`
-- Invalid enum values result in `IOException`
-- Truncated or malformed payloads result in `IOException`
+All parsing and encoding errors are reported explicitly:
 
-No unchecked exceptions escape parsing paths.
+- Unknown message IDs → `IOException`
+- Invalid field types → `IOException`
+- Invalid enum values → `IOException`
+- Truncated or malformed payloads → `IOException`
 
+No unchecked exceptions escape payload encode/decode paths.
+
+---
 
 ## Design Philosophy
 
@@ -126,13 +153,7 @@ No unchecked exceptions escape parsing paths.
 - Explicit errors over silent failure
 - Practical MAVLink usage, not theoretical completeness
 
-
-## License
-
-Apache License 2.0
-
-See the `LICENSE` file for details.
-
+---
 
 ## Intended Users
 
@@ -143,5 +164,13 @@ This library is intended for:
 - Telemetry ingestion pipelines
 - MAVLink-aware tooling that does not want transport coupling
 
-If you want a full MAVLink stack, use something else.
+If you want a full MAVLink stack, use something else.  
 If you want a clean, deterministic payload codec, this is it.
+
+---
+
+## License
+
+Apache License 2.0
+
+See the `LICENSE` file for details.
