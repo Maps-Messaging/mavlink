@@ -67,29 +67,33 @@ public final class MavlinkEnumResolver {
       return (int) entry.getValue();
     }
 
-    if (value instanceof List<?> list) {
+    if (value instanceof Object[] arr) {
       if (!enumDef.isBitmask()) {
         throw new IOException("Enum '" + enumName + "' is not a bitmask");
       }
 
       int mask = 0;
-      for (Object element : list) {
-        if (!(element instanceof String name)) {
-          throw new IOException(
-              "Bitmask enum '" + enumName + "' expects string values");
+      for (Object element : arr) {
+        MavlinkEnumEntry entry;
+        if(element instanceof Number index){
+          List<MavlinkEnumEntry> entries = enumDef.getByBitmask(index.longValue());
+          for(MavlinkEnumEntry mavlinkEnumEntry:entries){
+            mask |= mavlinkEnumEntry.getValue();
+          }
         }
-        MavlinkEnumEntry entry = enumDef.getByName(name);
-        if (entry == null) {
-          throw new IOException(
-              "Unknown enum value '" + name + "' for enum '" + enumName + "'");
+        else if(element instanceof String name) {
+          entry = enumDef.getByName(name);
+          if (entry == null) {
+            throw new IOException("Unknown enum value '" + enumName + "' for enum '" + enumName + "'");
+          }
+          mask |= entry.getValue();
         }
-        mask |= entry.getValue();
+        else{
+          throw new IOException("Bitmask enum '" + enumName + "' expects string values");
+        }
       }
       return mask;
     }
-
-    throw new IOException(
-        "Unsupported enum value type for field '" + field.getName() +
-            "': " + value.getClass().getName());
+    throw new IOException("Unsupported enum value type for field '" + field.getName() + "': " + value.getClass().getName());
   }
 }

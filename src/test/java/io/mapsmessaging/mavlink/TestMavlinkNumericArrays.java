@@ -7,7 +7,7 @@ import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
 import io.mapsmessaging.mavlink.message.fields.MavlinkWireType;
 import org.junit.jupiter.api.Assertions;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.HashMap;

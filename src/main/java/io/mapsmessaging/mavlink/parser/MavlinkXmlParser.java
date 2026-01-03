@@ -111,7 +111,6 @@ public class MavlinkXmlParser {
 
   private Map<String, MavlinkEnumDefinition> parseEnums(Document document) {
     Map<String, MavlinkEnumDefinition> enumMap = new LinkedHashMap<>();
-
     NodeList enumNodes = document.getElementsByTagName("enum");
     for (int i = 0; i < enumNodes.getLength(); i++) {
       Node node = enumNodes.item(i);

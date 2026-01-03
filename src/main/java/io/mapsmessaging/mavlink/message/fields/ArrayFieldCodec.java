@@ -54,11 +54,7 @@ public class ArrayFieldCodec extends AbstractMavlinkFieldCodec {
       return new String(temp, 0, end);
     }
 
-    List<Object> values = new ArrayList<>(arrayLength);
-    for (int index = 0; index < arrayLength; index++) {
-      values.add(elementCodec.decode(buffer));
-    }
-    return values;
+    return elementCodec.decode(buffer);
   }
 
   @Override

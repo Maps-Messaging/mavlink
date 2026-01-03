@@ -40,9 +40,11 @@ public class MavlinkPayloadPacker {
 
     ByteBuffer buffer = allocate(payloadSize);
     encodePayload(compiledFields, lastExtensionIndex, values, buffer);
-
-
-    return buffer.array();
+    int length = buffer.position();
+    byte[] out = new byte[length];
+    buffer.flip();
+    buffer.get(out);
+    return out;
   }
 
   private MavlinkCompiledMessage getCompiledMessage(int messageId) throws IOException {
@@ -185,10 +187,10 @@ public class MavlinkPayloadPacker {
     int count = Math.min(len, elements.size());
 
     try {
-      for (int i = 0; i < count; i++) {
-        codec.encode(buffer, elements.get(i));
-      }
+      codec.encode(buffer, elements);
     } catch (Exception e) {
+      e.printStackTrace();
+
       throw new IOException("Failed to encode array field '" + field.getName() + "'", e);
     }
 

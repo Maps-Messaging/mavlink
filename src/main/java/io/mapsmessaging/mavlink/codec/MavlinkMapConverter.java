@@ -19,6 +19,7 @@ package io.mapsmessaging.mavlink.codec;
 
 import io.mapsmessaging.mavlink.message.MavlinkFrame;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 
@@ -30,7 +31,7 @@ public class MavlinkMapConverter {
     this.payloadParser = Objects.requireNonNull(payloadParser, "payloadParser");
   }
 
-  public Map<String, Object> convert(MavlinkFrame frame) {
+  public Map<String, Object> convert(MavlinkFrame frame) throws IOException {
     return payloadParser.parsePayload(frame.getMessageId(), frame.getPayload());
   }
 }

@@ -7,8 +7,8 @@ import io.mapsmessaging.mavlink.message.fields.MavlinkEnumDefinition;
 import io.mapsmessaging.mavlink.message.fields.MavlinkEnumEntry;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
 import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -22,6 +22,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class MavlinkRoundTripAllMessagesTest {
 
   private static final long BASE_SEED = 0xC0FFEE_1234ABCDL;
+
+  @Test
+  void bootTest() {
+    // Intentionally empty. Maven demands tribute.
+  }
 
   @TestFactory
   Stream<DynamicTest> allMessages_baseFields_roundTrip() throws Exception {
@@ -48,40 +53,68 @@ class MavlinkRoundTripAllMessagesTest {
         ));
   }
 
-  @Test
-  void parallel_encode_decode_sanity_no_shared_state() throws Exception {
+  @TestFactory
+  Stream<DynamicTest> parallel_encode_decode_sanity_no_shared_state_per_message() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
     MavlinkMessageRegistry registry = codec.getRegistry();
 
-    List<MavlinkCompiledMessage> messages = registry.getCompiledMessages();
-    assertFalse(messages.isEmpty());
-
     int threads = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
+    int tasksPerMessage = 8; // tune: enough to shake shared state without being silly
+
+    return registry.getCompiledMessages().stream()
+        .map(msg -> DynamicTest.dynamicTest(
+            msg.getMessageId() + " " + msg.getName(),
+            () -> runParallelRoundTrips(codec, registry, msg, threads, tasksPerMessage)
+        ));
+  }
+
+  private static void runParallelRoundTrips(
+      MavlinkCodec codec,
+      MavlinkMessageRegistry registry,
+      MavlinkCompiledMessage msg,
+      int threads,
+      int tasksPerMessage
+  ) throws Exception {
+
     ExecutorService executor = Executors.newFixedThreadPool(threads);
 
     try {
-      int tasks = Math.min(200, messages.size() * 2);
-      List<Callable<Void>> callables = new ArrayList<>(tasks);
-
-      for (int i = 0; i < tasks; i++) {
-        MavlinkCompiledMessage msg = messages.get(i % messages.size());
-        int messageId = msg.getMessageId();
+      List<Callable<Void>> callables = new ArrayList<>(tasksPerMessage);
+      for (int i = 0; i < tasksPerMessage; i++) {
+        final int taskIndex = i;
 
         callables.add(() -> {
-          roundTripForMessage(codec, registry, msg, ExtensionMode.SOME_PRESENT);
+          // Vary seed per task so we don't just replay the same values in parallel.
+          long seed = BASE_SEED ^ (((long) msg.getMessageId()) << 32) ^ taskIndex;
+          Map<String, Object> input =
+              RandomValueFactory.buildValues(registry, msg, ExtensionMode.SOME_PRESENT, seed);
+
+          byte[] payload = codec.encodePayload(msg.getMessageId(), input);
+          Map<String, Object> output = codec.parsePayload(msg.getMessageId(), payload);
+
+          for (Map.Entry<String, Object> entry : input.entrySet()) {
+            String fieldName = entry.getKey();
+            Object expected = entry.getValue();
+            Object actual = output.get(fieldName);
+            if (actual == null) {
+              fail("Missing field after decode: message " + msg.getMessageId() + " (" + msg.getName() + ") field=" + fieldName);
+            }
+
+            MavlinkFieldDefinition fd = RandomValueFactory.fieldByName(msg, fieldName);
+            ValueAssertions.assertFieldEquals(fd, expected, actual, msg);
+          }
           return null;
         });
       }
 
       List<Future<Void>> futures = executor.invokeAll(callables, 30, TimeUnit.SECONDS);
       for (Future<Void> f : futures) {
-        f.get(); // propagate failures
+        f.get();
       }
     } finally {
       executor.shutdownNow();
     }
   }
-
   private static void roundTripForMessage(
       MavlinkCodec codec,
       MavlinkMessageRegistry registry,
@@ -162,7 +195,7 @@ class MavlinkRoundTripAllMessagesTest {
         if (fd.isExtension()) {
           break;
         }
-        size += MavlinkTestSupport.size(cf);
+        size += cf.getSizeInBytes();
       }
       return size;
     }

@@ -28,6 +28,7 @@ import io.mapsmessaging.mavlink.message.fields.AbstractMavlinkFieldCodec;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
 import io.mapsmessaging.mavlink.message.fields.MavlinkWireType;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +45,7 @@ public class MavlinkPayloadParser {
     this.messageRegistry = messageRegistry;
   }
 
-  public Map<String, Object> parsePayload(int messageId, byte[] payload) {
+  public Map<String, Object> parsePayload(int messageId, byte[] payload) throws IOException {
     MavlinkCompiledMessage compiledMessage =
         messageRegistry.getCompiledMessagesById().get(messageId);
     if (compiledMessage == null) {
@@ -66,7 +67,7 @@ public class MavlinkPayloadParser {
       // Base fields MUST be present
       if (!fieldDefinition.isExtension()) {
         if (buffer.remaining() < fieldSize) {
-          throw new IllegalArgumentException(
+          throw new IOException(
               "Payload too short for base field '" + fieldName +
                   "' in message " + compiledMessage.getName() +
                   " remaining=" + buffer.remaining() +

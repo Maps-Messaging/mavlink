@@ -73,6 +73,23 @@ public class MavlinkEnumDefinition {
     return null;
   }
 
+  public List<MavlinkEnumEntry> getByBitmask(long mask) {
+    if (!bitmask || mask == 0) {
+      return List.of();
+    }
+
+    List<MavlinkEnumEntry> result = new ArrayList<>();
+
+    for (MavlinkEnumEntry entry : entries) {
+      long value = entry.getValue();
+      if ((mask & value) == value) {
+        result.add(entry);
+      }
+    }
+
+    return result;
+  }
+
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();

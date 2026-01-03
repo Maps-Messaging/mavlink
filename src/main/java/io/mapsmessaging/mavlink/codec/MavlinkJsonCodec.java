@@ -49,7 +49,7 @@ public class MavlinkJsonCodec {
 
 
 
-  public JsonObject toJson(MavlinkFrame frame) {
+  public JsonObject toJson(MavlinkFrame frame) throws IOException {
     Map<String, Object> map = mapConverter.convert(frame);
     String json = GSON.toJson(map);
     return JsonParser.parseString(json).getAsJsonObject();
