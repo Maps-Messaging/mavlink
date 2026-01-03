@@ -23,6 +23,7 @@ import io.mapsmessaging.mavlink.message.fields.MavlinkEnumEntry;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -73,26 +74,30 @@ public final class MavlinkEnumResolver {
       }
 
       int mask = 0;
+      List<Integer> res = new ArrayList<>();
       for (Object element : arr) {
         MavlinkEnumEntry entry;
         if(element instanceof Number index){
           List<MavlinkEnumEntry> entries = enumDef.getByBitmask(index.longValue());
+          mask = 0;
           for(MavlinkEnumEntry mavlinkEnumEntry:entries){
             mask |= mavlinkEnumEntry.getValue();
           }
+          res.add(mask);
         }
         else if(element instanceof String name) {
           entry = enumDef.getByName(name);
           if (entry == null) {
             throw new IOException("Unknown enum value '" + enumName + "' for enum '" + enumName + "'");
           }
-          mask |= entry.getValue();
+          mask = (int)enumDef.getByName(name).getValue();
+          res.add(mask);
         }
         else{
           throw new IOException("Bitmask enum '" + enumName + "' expects string values");
         }
       }
-      return mask;
+      return res;
     }
     throw new IOException("Unsupported enum value type for field '" + field.getName() + "': " + value.getClass().getName());
   }
