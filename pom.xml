@@ -74,20 +74,6 @@
             <properties>
                 <maven.deploy.skip>true</maven.deploy.skip>
             </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>io.mapsmessaging</groupId>
-                    <artifactId>simple_logging</artifactId>
-                    <version>2.1.1</version>
-                </dependency>
-
-                <!-- JMS Selector logic module -->
-                <dependency>
-                    <groupId>io.mapsmessaging</groupId>
-                    <artifactId>jms_selector_parser</artifactId>
-                    <version>2.1.0</version>
-                </dependency>
-            </dependencies>
             <build>
                 <plugins>
                     <!-- Central publisher -->
@@ -130,13 +116,6 @@
                     </snapshots>
                 </repository>
             </repositories>
-            <dependencies>
-                <dependency>
-                    <groupId>io.mapsmessaging</groupId>
-                    <artifactId>simple_logging</artifactId>
-                    <version>2.1.2-SNAPSHOT</version>
-                </dependency>
-            </dependencies>
         </profile>
     </profiles>
 
@@ -376,6 +355,7 @@
             <version>1.18.38</version>
             <scope>provided</scope>
         </dependency>
+
         <!-- https://mvnrepository.com/artifact/com.google.code.gson/gson -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -383,35 +363,12 @@
             <version>2.13.2</version>
         </dependency>
 
-
         <!-- Junit5 -->
         <dependency>
             <artifactId>junit-jupiter-engine</artifactId>
             <groupId>org.junit.jupiter</groupId>
             <scope>test</scope>
             <version>6.0.1</version>
-        </dependency>
-
-        <!-- https://mvnrepository.com/artifact/com.github.javafaker/javafaker -->
-        <dependency>
-            <groupId>com.github.javafaker</groupId>
-            <artifactId>javafaker</artifactId>
-            <version>1.0.2</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- https://mvnrepository.com/artifact/org.mockito/mockito-core -->
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>5.20.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
-            <version>RELEASE</version>
-            <scope>compile</scope>
         </dependency>
 
     </dependencies>

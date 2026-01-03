@@ -8,8 +8,9 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.Map;
 
-import static org.testng.Assert.assertThrows;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 
 class TestMavlinkRobustness {
 
@@ -86,10 +87,10 @@ class TestMavlinkRobustness {
     MavlinkMessageRegistry registry = codec.getRegistry();
     Assertions.assertNotNull(registry);
 
-    Assertions.assertTrue(registry.getCompiledMessagesById().containsKey(0), "HEARTBEAT");
-    Assertions.assertTrue(registry.getCompiledMessagesById().containsKey(1), "SYS_STATUS");
-    Assertions.assertTrue(registry.getCompiledMessagesById().containsKey(33), "GLOBAL_POSITION_INT");
-    Assertions.assertTrue(registry.getCompiledMessagesById().containsKey(148), "AUTOPILOT_VERSION");
+    assertTrue(registry.getCompiledMessagesById().containsKey(0), "HEARTBEAT");
+    assertTrue(registry.getCompiledMessagesById().containsKey(1), "SYS_STATUS");
+    assertTrue(registry.getCompiledMessagesById().containsKey(33), "GLOBAL_POSITION_INT");
+    assertTrue(registry.getCompiledMessagesById().containsKey(148), "AUTOPILOT_VERSION");
 
     Assertions.assertEquals(232, registry.getCompiledMessages().size());
   }

@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.testng.AssertJUnit.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class TestMavlinkNumericArrays {
 
@@ -76,11 +76,11 @@ class TestMavlinkNumericArrays {
     values.put(fieldDefinition.getName(), longList);
 
     byte[] payload = codec.encodePayload(messageId, values);
-    Assertions.assertNotNull(payload);
+    assertNotNull(payload);
 
     Map<String, Object> decoded = codec.parsePayload(messageId, payload);
-    Assertions.assertNotNull(decoded);
-    Assertions.assertNotNull(decoded.get(fieldDefinition.getName()));
+    assertNotNull(decoded);
+    assertNotNull(decoded.get(fieldDefinition.getName()));
   }
 
   private MavlinkCompiledField findFirstNumericArrayField(MavlinkCompiledMessage message) {
