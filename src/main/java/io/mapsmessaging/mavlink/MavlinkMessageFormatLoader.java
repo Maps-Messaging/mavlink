@@ -37,6 +37,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 
+/**
+ * Loads and caches MAVLink dialect definitions and builds {@link MavlinkCodec} instances for them.
+ *
+ * <p>The loader provides a built-in {@code "common"} dialect that is loaded eagerly at startup
+ * (fail-fast). Additional dialects may be loaded at runtime from an {@link InputStream} with a
+ * caller-supplied {@link MavlinkIncludeResolver} for resolving {@code <include>} directives.</p>
+ *
+ * <p>Dialects are cached by name and can be retrieved via {@link #getDialect(String)} or
+ * {@link #getDialectOrThrow(String)}.</p>
+ */
 public final class MavlinkMessageFormatLoader {
 
   private static final String DEFAULT_DIALECT_NAME = "common";
@@ -44,6 +54,11 @@ public final class MavlinkMessageFormatLoader {
 
   private static final MavlinkMessageFormatLoader INSTANCE = new MavlinkMessageFormatLoader();
 
+  /**
+   * Returns the singleton loader instance.
+   *
+   * @return singleton {@link MavlinkMessageFormatLoader}
+   */
   public static MavlinkMessageFormatLoader getInstance() {
     return INSTANCE;
   }
@@ -66,11 +81,28 @@ public final class MavlinkMessageFormatLoader {
     }
   }
 
+  /**
+   * Returns a cached dialect codec if present.
+   *
+   * <p>If {@code dialectName} is {@code null} or blank, {@code "common"} is assumed.</p>
+   *
+   * @param dialectName dialect name (e.g. {@code "common"})
+   * @return codec if loaded/cached
+   */
   public Optional<MavlinkCodec> getDialect(String dialectName) {
     String normalizedDialectName = normalizeDialectName(dialectName);
     return Optional.ofNullable(dialects.get(normalizedDialectName));
   }
 
+  /**
+   * Returns a cached dialect codec, or throws if the dialect has not been loaded.
+   *
+   * <p>If {@code dialectName} is {@code null} or blank, {@code "common"} is assumed.</p>
+   *
+   * @param dialectName dialect name (e.g. {@code "common"})
+   * @return cached codec
+   * @throws IOException if the dialect is not known/loaded
+   */
   public MavlinkCodec getDialectOrThrow(String dialectName) throws IOException {
     String normalizedDialectName = normalizeDialectName(dialectName);
     MavlinkCodec codec = dialects.get(normalizedDialectName);
@@ -83,10 +115,20 @@ public final class MavlinkMessageFormatLoader {
   }
 
   /**
-   * Load a dialect by name from classpath, resolving &lt;include&gt; from the mavlink/ folder.
+   * Loads a dialect by name from the classpath.
    *
-   * Not public on purpose: public users should either use built-ins via getDialectOrThrow(),
-   * or load custom dialects via loadDialect(...).
+   * <p>{@code <include>} directives are resolved from the {@code mavlink/} classpath folder.</p>
+   *
+   * <p>This method is not public by design. Public callers should either use built-ins via
+   * {@link #getDialectOrThrow(String)}, or load custom dialects via
+   * {@link #loadDialect(String, InputStream, MavlinkIncludeResolver)}.</p>
+   *
+   * @param dialectName dialect name used for caching and lookup
+   * @param classpathXml classpath resource path for the dialect XML
+   * @return built codec for the dialect
+   * @throws IOException if the classpath resource cannot be opened
+   * @throws ParserConfigurationException if the XML parser cannot be configured
+   * @throws SAXException if the dialect XML is invalid
    */
   protected MavlinkCodec loadDialectFromClasspath(String dialectName, String classpathXml)
       throws IOException, ParserConfigurationException, SAXException {
@@ -113,8 +155,17 @@ public final class MavlinkMessageFormatLoader {
   }
 
   /**
-   * Load a dialect from an arbitrary stream, resolving &lt;include&gt; using the provided resolver.
-   * The loaded dialect will be cached and can be retrieved with getDialect()/getDialectOrThrow().
+   * Loads a dialect from an arbitrary stream and caches the resulting codec under the dialect name.
+   *
+   * <p>{@code <include>} directives are resolved using the provided {@link MavlinkIncludeResolver}.</p>
+   *
+   * @param dialectName dialect name used for caching and lookup
+   * @param inputStream dialect XML stream (not closed by this method)
+   * @param includeResolver include resolver for {@code <include>} directives
+   * @return built codec for the dialect
+   * @throws IOException if the dialect cannot be read or resolved
+   * @throws ParserConfigurationException if the XML parser cannot be configured
+   * @throws SAXException if the dialect XML is invalid
    */
   public MavlinkCodec loadDialect(String dialectName, InputStream inputStream, MavlinkIncludeResolver includeResolver)
       throws IOException, ParserConfigurationException, SAXException {

@@ -37,9 +37,20 @@ import java.util.Optional;
 /**
  * MAVLink full-frame codec (framing + CRC + optional signature bytes + payload encode/decode).
  *
- * Buffer contract:
- * - Unpack uses a network-owned ByteBuffer in write-mode. It flips/compacts internally.
- * - Pack writes a complete MAVLink frame to the provided output buffer at its current position.
+ * <p>This codec combines:</p>
+ * <ul>
+ *   <li>Frame decoding from a streaming network buffer via {@link MavlinkFrameFramer}</li>
+ *   <li>Frame packing (including CRC) via {@link MavlinkFramePacker}</li>
+ *   <li>Payload field encoding/decoding via {@link MavlinkCodec}</li>
+ * </ul>
+ *
+ * <h2>Buffer contract</h2>
+ * <ul>
+ *   <li>{@link #tryUnpackFrame(ByteBuffer)} consumes a network-owned {@link ByteBuffer} in write-mode and
+ *       may {@code flip}/{@code compact} internally.</li>
+ *   <li>{@link #packFrame(ByteBuffer, MavlinkFrame)} writes a complete MAVLink frame into the provided output
+ *       buffer at its current position.</li>
+ * </ul>
  */
 public final class MavlinkFrameCodec {
 
@@ -47,6 +58,12 @@ public final class MavlinkFrameCodec {
   private final MavlinkFrameFramer framer;
   private final MavlinkFramePacker packer;
 
+  /**
+   * Creates a frame codec for the dialect contained in the provided payload codec.
+   *
+   * @param payloadCodec codec providing the dialect name, message registry, and payload encode/decode
+   * @throws NullPointerException if {@code payloadCodec} is {@code null}
+   */
   public MavlinkFrameCodec(MavlinkCodec payloadCodec) {
     this.payloadCodec = Objects.requireNonNull(payloadCodec, "payloadCodec");
 
@@ -56,17 +73,31 @@ public final class MavlinkFrameCodec {
     this.packer = new MavlinkFramePacker(dialectRegistry);
   }
 
+  /**
+   * Returns the dialect name for this codec (for example {@code "common"}).
+   *
+   * @return dialect name
+   */
   public String getDialectName() {
     return payloadCodec.getName();
   }
 
+  /**
+   * Returns the compiled message registry for the dialect.
+   *
+   * @return message registry
+   */
   public MavlinkMessageRegistry getRegistry() {
     return payloadCodec.getRegistry();
   }
 
   /**
    * Attempts to decode a single MAVLink frame from the provided network-owned buffer.
-   * Returns empty if no full valid frame is available yet.
+   *
+   * <p>Returns {@link Optional#empty()} if a complete valid frame is not yet available.</p>
+   *
+   * @param networkOwnedBuffer network buffer in write-mode (may be flipped/compacted internally)
+   * @return decoded frame if available and valid
    */
   public Optional<MavlinkFrame> tryUnpackFrame(ByteBuffer networkOwnedBuffer) {
     return framer.tryDecode(networkOwnedBuffer);
@@ -74,7 +105,11 @@ public final class MavlinkFrameCodec {
 
   /**
    * Packs a MAVLink frame into the provided output buffer at its current position.
-   * CRC is computed using the dialect registry and written into the frame.
+   *
+   * <p>CRC is computed using the dialect registry and written into the frame.</p>
+   *
+   * @param out output buffer to write into (at current position)
+   * @param frame frame to pack
    */
   public void packFrame(ByteBuffer out, MavlinkFrame frame) {
     packer.pack(out, frame);
@@ -82,6 +117,11 @@ public final class MavlinkFrameCodec {
 
   /**
    * Parses the payload of a decoded MAVLink frame into a field map.
+   *
+   * @param frame decoded frame containing {@code messageId} and payload bytes
+   * @return field map keyed by field name
+   * @throws IOException if payload decoding fails for the message type
+   * @throws NullPointerException if {@code frame} or its payload is {@code null}
    */
   public Map<String, Object> parsePayload(MavlinkFrame frame) throws IOException {
     Objects.requireNonNull(frame, "frame");
@@ -91,14 +131,26 @@ public final class MavlinkFrameCodec {
   }
 
   /**
-   * Encodes the supplied field map into payload bytes for the given messageId.
+   * Encodes the supplied field map into payload bytes for the given message id.
+   *
+   * @param messageId MAVLink message id
+   * @param values field values keyed by field name
+   * @return encoded payload bytes
+   * @throws IOException if payload encoding fails for the message type or values
    */
   public byte[] encodePayload(int messageId, Map<String, Object> values) throws IOException {
     return payloadCodec.encodePayload(messageId, values);
   }
 
   /**
-   * Helper: encode payload and populate the provided frame (messageId + payload bytes + payloadLength).
+   * Encodes the supplied field map and populates the provided frame with {@code messageId},
+   * payload bytes, and payload length.
+   *
+   * @param frame target frame to update
+   * @param messageId MAVLink message id
+   * @param values field values keyed by field name
+   * @throws IOException if payload encoding fails
+   * @throws NullPointerException if {@code frame} or {@code values} is {@code null}
    */
   public void encodePayloadIntoFrame(MavlinkFrame frame, int messageId, Map<String, Object> values) throws IOException {
     Objects.requireNonNull(frame, "frame");
@@ -112,7 +164,7 @@ public final class MavlinkFrameCodec {
   }
 
   /**
-   * Adapter from compiled registry to framing needs (CRC extra + minimum/base payload length).
+   * Adapter from the compiled registry to the framing requirements (CRC extra and minimum/base payload length).
    */
   private static final class RegistryAdapter implements MavlinkDialectRegistry {
 
@@ -122,6 +174,14 @@ public final class MavlinkFrameCodec {
       this.registry = Objects.requireNonNull(registry, "registry");
     }
 
+    /**
+     * Returns the CRC extra byte for a message id.
+     *
+     * @param version MAVLink version
+     * @param messageId MAVLink message id
+     * @return CRC extra byte (0..255)
+     * @throws IllegalArgumentException if the message id is unknown to the registry
+     */
     @Override
     public int crcExtra(MavlinkVersion version, int messageId) {
       MavlinkCompiledMessage compiled = registry.getCompiledMessagesById().get(messageId);
@@ -131,6 +191,16 @@ public final class MavlinkFrameCodec {
       return compiled.getCrcExtra() & 0xFF;
     }
 
+    /**
+     * Returns the minimum payload length required for a message id.
+     *
+     * <p>For MAVLink v1 this is the fixed payload size.
+     * For MAVLink v2 this is the base payload size (extensions are optional).</p>
+     *
+     * @param version MAVLink version
+     * @param messageId MAVLink message id
+     * @return minimum required payload length in bytes; {@link Integer#MAX_VALUE} if unknown
+     */
     @Override
     public int minimumPayloadLength(MavlinkVersion version, int messageId) {
       MavlinkCompiledMessage compiled = registry.getCompiledMessagesById().get(messageId);
@@ -138,8 +208,6 @@ public final class MavlinkFrameCodec {
         return Integer.MAX_VALUE; // force failure
       }
 
-      // V1: fixed payload size. V2: base length (extensions optional).
-      // Assuming your compiled message exposes both sizes; if not, see notes below.
       if (version == MavlinkVersion.V1) {
         return compiled.getPayloadSizeBytes();
       }
