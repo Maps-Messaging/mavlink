@@ -251,32 +251,6 @@
                 <version>3.5.4</version>
             </plugin>
 
-            <!-- JavaDoc -->
-            <plugin>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <configuration>
-                    <charset>UTF-8</charset>
-                    <encoding>UTF-8</encoding>
-                    <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
-                    <outputDirectory>${project.build.directory}/site/docs</outputDirectory>
-                    <show>public</show>
-                    <sourceFileExcludes>
-                        <sourceFileExclude>**/*Test.java</sourceFileExclude>
-                        <sourceFileExclude>**/Test*.java</sourceFileExclude>
-                        <sourceFileExclude>**/*IT.java</sourceFileExclude>
-                    </sourceFileExcludes>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                        <id>attach-javadocs</id>
-                    </execution>
-                </executions>
-                <groupId>org.apache.maven.plugins</groupId>
-                <version>3.12.0</version>
-            </plugin>
             <!-- sBOM  generator -->
             <plugin>
                 <groupId>org.cyclonedx</groupId>
