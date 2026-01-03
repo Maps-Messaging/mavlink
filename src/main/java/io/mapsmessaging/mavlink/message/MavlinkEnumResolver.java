@@ -70,7 +70,13 @@ public final class MavlinkEnumResolver {
 
     if (value instanceof Object[] arr) {
       if (!enumDef.isBitmask()) {
-        throw new IOException("Enum '" + enumName + "' is not a bitmask");
+        List<Integer> res = new ArrayList<>();
+        for(Object item:arr){
+          if(item instanceof Number num){
+            res.add(num.intValue());
+          }
+        }
+        return res;
       }
 
       int mask = 0;
