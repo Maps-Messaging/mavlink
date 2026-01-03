@@ -30,6 +30,8 @@ public class MavlinkCompiledMessage {
   private MavlinkMessageDefinition messageDefinition;
   private List<MavlinkCompiledField> compiledFields;
   private int payloadSizeBytes;
+  private int minimumPayloadSizeBytes;
+  private int crcExtra;
 
   @Override
   public String toString() {
@@ -40,6 +42,10 @@ public class MavlinkCompiledMessage {
         .append(name)
         .append(", payloadSize=")
         .append(payloadSizeBytes)
+        .append(", minPayloadSize=")
+        .append(minimumPayloadSizeBytes)
+        .append(", crcExtra=")
+        .append(crcExtra)
         .append("]\n");
 
     for (MavlinkCompiledField compiledField : compiledFields) {
@@ -47,6 +53,4 @@ public class MavlinkCompiledMessage {
     }
     return builder.toString();
   }
-
 }
-

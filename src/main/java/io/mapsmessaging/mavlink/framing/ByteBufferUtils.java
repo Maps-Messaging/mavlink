@@ -1,0 +1,47 @@
+/*
+ *
+ *     Copyright [ 2020 - 2026 ] [Matthew Buckton]
+ *
+ *     Licensed under the Apache License, Version 2.0 (the "License");
+ *     you may not use this file except in compliance with the License.
+ *     You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     Unless required by applicable law or agreed to in writing, software
+ *     distributed under the License is distributed on an "AS IS" BASIS,
+ *     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *     See the License for the specific language governing permissions and
+ *     limitations under the License.
+ */
+
+package io.mapsmessaging.mavlink.framing;
+
+import java.nio.ByteBuffer;
+
+final class ByteBufferUtils {
+
+  private ByteBufferUtils() {
+  }
+
+  static int readUnsignedLittleEndianShort(ByteBuffer buffer, int index) {
+    int low = buffer.get(index) & 0xFF;
+    int high = buffer.get(index + 1) & 0xFF;
+    return (high << 8) | low;
+  }
+
+  static int readUnsigned24BitLittleEndian(ByteBuffer buffer, int index) {
+    int b0 = buffer.get(index) & 0xFF;
+    int b1 = buffer.get(index + 1) & 0xFF;
+    int b2 = buffer.get(index + 2) & 0xFF;
+    return (b2 << 16) | (b1 << 8) | b0;
+  }
+
+  static byte[] copyBytes(ByteBuffer buffer, int index, int length) {
+    byte[] data = new byte[length];
+    ByteBuffer duplicate = buffer.duplicate();
+    duplicate.position(index);
+    duplicate.get(data);
+    return data;
+  }
+}
