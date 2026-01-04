@@ -104,6 +104,37 @@ public final class MavlinkFrameCodec {
   }
 
   /**
+   * Attempts to decode a single MAVLink frame and returns header + raw payload bytes only.
+   *
+   * <p>This does NOT decode payload fields. It is intended for routing decisions based on header metadata.</p>
+   *
+   * @param networkOwnedBuffer network buffer in write-mode (may be flipped/compacted internally)
+   * @return envelope containing header fields + raw payload bytes if a complete valid frame is available
+   */
+  public Optional<MavlinkFrameEnvelope> tryUnpackHeaderAndPayload(ByteBuffer networkOwnedBuffer) {
+    Optional<MavlinkFrame> decoded = framer.tryDecode(networkOwnedBuffer);
+    if (decoded.isEmpty()) {
+      return Optional.empty();
+    }
+
+    MavlinkFrame frame = decoded.get();
+    byte[] payload = Objects.requireNonNull(frame.getPayload(), "frame.payload");
+
+    MavlinkFrameEnvelope envelope = new MavlinkFrameEnvelope(
+        frame.getVersion(),
+        frame.getMessageId(),
+        frame.getSystemId(),
+        frame.getComponentId(),
+        frame.getSequence(),
+        frame.getPayloadLength(),
+        payload,
+        frame.isSigned()
+    );
+
+    return Optional.of(envelope);
+  }
+
+  /**
    * Packs a MAVLink frame into the provided output buffer at its current position.
    *
    * <p>CRC is computed using the dialect registry and written into the frame.</p>

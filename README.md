@@ -26,12 +26,11 @@ It **does**:
 
 It **does not**:
 
-- Parse or generate MAVLink v1/v2 frames
-- Handle headers, CRCs, signing, or framing
 - Manage system IDs, component IDs, or sequence numbers
 - Implement any transport (UART, UDP, TCP, etc.)
 
-If you need a full MAVLink stack, this library is not it.
+Frame parsing, CRC handling, and framing are provided by the framework layer
+built on top of this codec.
 
 This library is designed to sit **under** a framing and transport layer.
 
@@ -174,3 +173,4 @@ If you want a clean, deterministic payload codec, this is it.
 Apache License 2.0
 
 See the `LICENSE` file for details.
+
