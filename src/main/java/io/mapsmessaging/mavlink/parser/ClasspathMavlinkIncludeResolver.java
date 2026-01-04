@@ -34,7 +34,7 @@ public class ClasspathMavlinkIncludeResolver implements MavlinkIncludeResolver {
 
   @Override
   public InputStream open(String includeName) throws IOException {
-    String path = basePath.endsWith("/") ? (basePath + includeName) : (basePath + File.separator + includeName);
+    String path = basePath.endsWith("/") ? (basePath + includeName) : (basePath + "/" + includeName);
     return classLoader.getResourceAsStream(path);
   }
 }
