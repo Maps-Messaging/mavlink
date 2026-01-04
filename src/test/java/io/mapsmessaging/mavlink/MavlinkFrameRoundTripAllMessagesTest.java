@@ -64,7 +64,7 @@ class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
 
     ByteBuffer networkOwned = ByteBuffer.allocate(out.remaining() + 16);
     networkOwned.put(out);
-
+    networkOwned.flip();
     Optional<MavlinkFrame> decodedOpt = frameCodec.tryUnpackFrame(networkOwned);
     assertTrue(decodedOpt.isPresent(), "Expected to decode a frame");
 

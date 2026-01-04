@@ -45,8 +45,6 @@ public final class MavlinkFrameFramer {
   }
 
   public Optional<MavlinkFrame> tryDecode(ByteBuffer networkOwnedBuffer) {
-    networkOwnedBuffer.flip();
-
     try {
       if (!networkOwnedBuffer.hasRemaining()) {
         return Optional.empty();
