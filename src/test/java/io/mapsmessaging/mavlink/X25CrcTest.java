@@ -38,7 +38,7 @@ class X25CrcTest {
     crc.update(data);
 
     int crcValue = crc.getCrc() & 0xFFFF;
-    assertEquals(0x906E, crcValue, "CRC-16/X.25 of '123456789' must be 0x906E");
+    assertEquals(0x6F91, crcValue, "CRC-16/X.25 of '123456789' must be 0x906E");
   }
 
   @Test

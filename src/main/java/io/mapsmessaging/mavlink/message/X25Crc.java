@@ -18,17 +18,14 @@
 package io.mapsmessaging.mavlink.message;
 
 /**
- * CRC-16/X.25 implementation.
- * <p>
+ * MAVLink CRC-16/X25 implementation.
+ *
  * Parameters:
- * Name   : X.25
  * Poly   : 0x1021 (reflected as 0x8408)
  * Init   : 0xFFFF
  * RefIn  : true
  * RefOut : true
- * XorOut : 0xFFFF
- * <p>
- * This matches the CRC used by MAVLink v1 and v2.
+ * XorOut : 0x0000  (IMPORTANT: MAVLink does NOT apply final XOR)
  */
 public final class X25Crc {
 
@@ -41,9 +38,6 @@ public final class X25Crc {
     reset();
   }
 
-  /**
-   * Convenience one-shot calculation.
-   */
   public static int calculate(byte[] buffer, int offset, int length) {
     X25Crc crc = new X25Crc();
     crc.update(buffer, offset, length);
@@ -52,7 +46,7 @@ public final class X25Crc {
 
   public static int calculate(byte[] buffer) {
     if (buffer == null) {
-      return INITIAL_CRC ^ 0xFFFF;
+      return INITIAL_CRC;
     }
     return calculate(buffer, 0, buffer.length);
   }
@@ -68,6 +62,7 @@ public final class X25Crc {
   public void update(int value) {
     int data = value & 0xFF;
     currentCrc ^= data;
+
     for (int bitIndex = 0; bitIndex < 8; bitIndex++) {
       if ((currentCrc & 0x0001) != 0) {
         currentCrc = (currentCrc >>> 1) ^ POLYNOMIAL;
@@ -75,6 +70,8 @@ public final class X25Crc {
         currentCrc = currentCrc >>> 1;
       }
     }
+
+    currentCrc = currentCrc & 0xFFFF;
   }
 
   public void update(byte[] buffer) {
@@ -88,6 +85,7 @@ public final class X25Crc {
     if (buffer == null) {
       return;
     }
+
     int endIndex = offset + length;
     for (int index = offset; index < endIndex; index++) {
       update(buffer[index] & 0xFF);
@@ -95,19 +93,19 @@ public final class X25Crc {
   }
 
   /**
-   * Returns the final CRC value (after applying XorOut).
+   * MAVLink final CRC (no xor-out).
    */
   public int getCrc() {
-    return currentCrc ^ 0xFFFF;
+    return currentCrc & 0xFFFF;
+  }
+
+  public short getCrcAsShort() {
+    return (short) (currentCrc & 0xFFFF);
   }
 
   /**
-   * Returns the final CRC as a 16-bit value (lower 16 bits).
+   * Same as getCrc(); kept for compatibility if callers used it.
    */
-  public short getCrcAsShort() {
-    return (short) (getCrc() & 0xFFFF);
-  }
-
   public int getRawCrc() {
     return currentCrc & 0xFFFF;
   }
