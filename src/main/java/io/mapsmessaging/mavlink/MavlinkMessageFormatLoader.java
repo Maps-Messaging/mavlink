@@ -23,19 +23,16 @@ package io.mapsmessaging.mavlink;
 import io.mapsmessaging.mavlink.codec.MavlinkPayloadPacker;
 import io.mapsmessaging.mavlink.codec.MavlinkPayloadParser;
 import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.parser.ClasspathMavlinkIncludeResolver;
-import io.mapsmessaging.mavlink.parser.MavlinkDialectDefinition;
-import io.mapsmessaging.mavlink.parser.MavlinkDialectLoader;
-import io.mapsmessaging.mavlink.parser.MavlinkIncludeResolver;
-import io.mapsmessaging.mavlink.parser.MavlinkXmlParser;
+import io.mapsmessaging.mavlink.parser.*;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.xml.parsers.ParserConfigurationException;
-import org.xml.sax.SAXException;
 
 /**
  * Loads and caches MAVLink dialect definitions and builds {@link MavlinkCodec} instances for them.

@@ -23,9 +23,9 @@ package io.mapsmessaging.mavlink;
 import io.mapsmessaging.mavlink.framing.MavlinkDialectRegistry;
 import io.mapsmessaging.mavlink.framing.MavlinkFrameFramer;
 import io.mapsmessaging.mavlink.framing.MavlinkFramePacker;
+import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
 import io.mapsmessaging.mavlink.message.MavlinkFrame;
 import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
 import io.mapsmessaging.mavlink.message.MavlinkVersion;
 
 import java.io.IOException;

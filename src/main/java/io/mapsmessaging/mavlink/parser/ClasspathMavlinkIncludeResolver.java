@@ -17,6 +17,7 @@
 
 package io.mapsmessaging.mavlink.parser;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
@@ -33,7 +34,7 @@ public class ClasspathMavlinkIncludeResolver implements MavlinkIncludeResolver {
 
   @Override
   public InputStream open(String includeName) throws IOException {
-    String path = basePath.endsWith("/") ? (basePath + includeName) : (basePath + "/" + includeName);
+    String path = basePath.endsWith("/") ? (basePath + includeName) : (basePath + File.separator + includeName);
     return classLoader.getResourceAsStream(path);
   }
 }

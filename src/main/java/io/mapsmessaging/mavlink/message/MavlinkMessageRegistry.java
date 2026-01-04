@@ -22,7 +22,6 @@ import io.mapsmessaging.mavlink.message.fields.MavlinkEnumDefinition;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldCodecFactory;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
 import io.mapsmessaging.mavlink.parser.MavlinkDialectDefinition;
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 

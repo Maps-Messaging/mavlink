@@ -122,10 +122,8 @@ public final class MavlinkFramePacker {
     boolean signed = frame.isSigned();
     byte[] signature = frame.getSignature();
 
-    if (signed) {
-      if (signature == null || signature.length != V2_SIGNATURE_LENGTH) {
-        throw new IllegalArgumentException("Signed v2 frame must have signature[13]");
-      }
+    if (signed && signature == null || signature.length != V2_SIGNATURE_LENGTH) {
+      throw new IllegalArgumentException("Signed v2 frame must have signature[13]");
     }
 
     int required = 1 + MAVLINK_V2_HEADER_LENGTH + payloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);

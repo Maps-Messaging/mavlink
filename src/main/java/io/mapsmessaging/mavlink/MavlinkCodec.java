@@ -3,10 +3,11 @@ package io.mapsmessaging.mavlink;
 import io.mapsmessaging.mavlink.codec.MavlinkPayloadPacker;
 import io.mapsmessaging.mavlink.codec.MavlinkPayloadParser;
 import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
+import lombok.Getter;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
-import lombok.Getter;
 /**
  * MAVLink payload codec for a specific dialect.
  *
