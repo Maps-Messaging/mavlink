@@ -1,7 +1,7 @@
 /*
  *
  *  Copyright [ 2020 - 2024 ] Matthew Buckton
- *  Copyright [ 2024 - 2025 ] MapsMessaging B.V.
+ *  Copyright [ 2024 - 2026 ] MapsMessaging B.V.
  *
  *  Licensed under the Apache License, Version 2.0 with the Commons Clause
  *  (the "License"); you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 package io.mapsmessaging.mavlink.parser;
