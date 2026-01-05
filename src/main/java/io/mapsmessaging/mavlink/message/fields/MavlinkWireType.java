@@ -75,4 +75,15 @@ public enum MavlinkWireType {
     };
   }
 
+  public boolean isChar(){
+    return wireName.equals("char");
+  }
+
+  public boolean isFloat(){
+    return wireName.equals("float");
+  }
+
+  public boolean isDouble(){
+    return wireName.equals("double");
+  }
 }

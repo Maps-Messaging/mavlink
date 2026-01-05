@@ -17,11 +17,13 @@
 
 package io.mapsmessaging.mavlink.message;
 
+import com.google.gson.JsonObject;
 import io.mapsmessaging.mavlink.message.fields.AbstractMavlinkFieldCodec;
 import io.mapsmessaging.mavlink.message.fields.MavlinkEnumDefinition;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldCodecFactory;
 import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
 import io.mapsmessaging.mavlink.parser.MavlinkDialectDefinition;
+import io.mapsmessaging.mavlink.schema.MavlinkJsonSchemaBuilder;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -39,22 +41,29 @@ public class MavlinkMessageRegistry {
 
   private Map<String, MavlinkEnumDefinition> enumsByName;
 
+  private Map<Integer, JsonObject> jsonSchema;
+
+
+
   public static MavlinkMessageRegistry fromDialectDefinition(MavlinkDialectDefinition dialectDefinition) {
     MavlinkMessageRegistry registry = new MavlinkMessageRegistry();
     registry.setDialectName(dialectDefinition.getName());
 
     List<MavlinkCompiledMessage> compiledMessageList = new ArrayList<>();
     Map<Integer, MavlinkCompiledMessage> compiledByIdMap = new HashMap<>();
+    Map<Integer, JsonObject> schemaMap = new HashMap<>();
 
     for (MavlinkMessageDefinition messageDefinition : dialectDefinition.getMessages()) {
       MavlinkCompiledMessage compiledMessage = compileMessage(messageDefinition);
       compiledMessageList.add(compiledMessage);
       compiledByIdMap.put(compiledMessage.getMessageId(), compiledMessage);
+      schemaMap.put(compiledMessage.getMessageId(), MavlinkJsonSchemaBuilder.buildSchema(compiledMessage, dialectDefinition.getEnumsByName()));
     }
 
     registry.setCompiledMessages(compiledMessageList);
     registry.setCompiledMessagesById(compiledByIdMap);
     registry.setEnumsByName(new HashMap<>(dialectDefinition.getEnumsByName()));
+    registry.setJsonSchema(schemaMap);
 
     return registry;
   }
@@ -71,6 +80,9 @@ public class MavlinkMessageRegistry {
     this.compiledMessages = Collections.unmodifiableList(new ArrayList<>(compiledMessageList));
   }
 
+  private void setJsonSchema(Map<Integer, JsonObject> jsonSchemaMap ){
+    this.jsonSchema = Collections.unmodifiableMap(new HashMap<>(jsonSchemaMap));
+  }
 
   private static MavlinkCompiledMessage compileMessage(MavlinkMessageDefinition messageDefinition) {
     MavlinkCompiledMessage compiledMessage = new MavlinkCompiledMessage();

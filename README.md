@@ -23,6 +23,7 @@ It **does**:
 - Encode Java field maps into MAVLink payload bytes
 - Decode MAVLink payload bytes into typed field maps
 - Correctly handle MAVLink field ordering, arrays, enums, and extensions
+- Creates JsonSchemas to match the fields that it parses to and from
 
 It **does not**:
 
