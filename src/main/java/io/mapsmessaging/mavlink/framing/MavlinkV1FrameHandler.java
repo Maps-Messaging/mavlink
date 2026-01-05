@@ -39,7 +39,7 @@ public final class MavlinkV1FrameHandler implements MavlinkFrameHandler {
 
   @Override
   public int minimumBytesRequiredForHeader() {
-    return 1 + HEADER_LENGTH;
+    return HEADER_LENGTH;
   }
 
   @Override
@@ -49,7 +49,7 @@ public final class MavlinkV1FrameHandler implements MavlinkFrameHandler {
 
   @Override
   public int computeTotalFrameLength(ByteBuffer buffer, int frameStartIndex, int payloadLength) {
-    return 1 + HEADER_LENGTH + payloadLength + CRC_LENGTH;
+    return HEADER_LENGTH + payloadLength + CRC_LENGTH;
   }
 
   @Override
@@ -72,13 +72,13 @@ public final class MavlinkV1FrameHandler implements MavlinkFrameHandler {
       return Optional.empty();
     }
 
-    int payloadStartIndex = frameStartIndex + 1 + HEADER_LENGTH;
+    int payloadStartIndex = frameStartIndex + HEADER_LENGTH;
     int crcStartIndex = payloadStartIndex + payloadLength;
 
     int receivedChecksum = ByteBufferUtils.readUnsignedLittleEndianShort(candidateFrame, crcStartIndex);
 
     int crcExtra = dialectRegistry.crcExtra(MavlinkVersion.V1, messageId);
-    int computedChecksum = CrcHelper.computeChecksumFromWritten(candidateFrame, frameStartIndex + 1, (HEADER_LENGTH-1) + payloadLength, crcExtra);
+    int computedChecksum = CrcHelper.computeChecksumFromWritten(candidateFrame, frameStartIndex + 1, (HEADER_LENGTH) + payloadLength-1, crcExtra);
     if (computedChecksum != receivedChecksum) {
       return Optional.empty();
     }

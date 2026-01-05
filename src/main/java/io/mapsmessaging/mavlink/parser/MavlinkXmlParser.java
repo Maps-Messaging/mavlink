@@ -198,9 +198,6 @@ public class MavlinkXmlParser {
 
     List<MavlinkFieldDefinition> fields = parseMessageFields(messageElement);
     messageDefinition.setXmlOrderedFields(fields);
-
-    int extraCrc = MavlinkExtraCrcCalculator.computeExtraCrc(messageDefinition);
-    messageDefinition.setExtraCrc(extraCrc);
     return messageDefinition;
   }
 
