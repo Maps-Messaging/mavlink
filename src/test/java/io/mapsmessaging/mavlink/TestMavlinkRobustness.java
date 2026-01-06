@@ -48,28 +48,6 @@ class TestMavlinkRobustness {
   }
 
   @Test
-  void decode_truncatedPayload_throwsIOException() throws Exception {
-    MavlinkCodec codec = MavlinkTestSupport.codec();
-
-    // SYS_STATUS is a good stable target
-    byte[] payload = codec.encodePayload(1, Map.of(
-        "onboard_control_sensors_present", 1,
-        "onboard_control_sensors_enabled", 1,
-        "onboard_control_sensors_health", 1,
-        "load", 250,
-        "voltage_battery", 12000,
-        "current_battery", 100,
-        "battery_remaining", 90
-    ));
-
-    assertTrue(payload.length > 1);
-
-    byte[] truncated = java.util.Arrays.copyOf(payload, payload.length - 1);
-
-    assertThrows(IOException.class, () -> codec.parsePayload(1, truncated));
-  }
-
-  @Test
   void decode_oversizedPayload_isHandledDeterministically() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
 

@@ -56,51 +56,44 @@ public class MavlinkPayloadParser {
     ByteBuffer buffer = ByteBuffer.wrap(payload);
     buffer.order(ByteOrder.LITTLE_ENDIAN);
 
+    boolean truncated = false;
+
     for (MavlinkCompiledField compiledField : compiledMessage.getCompiledFields()) {
       MavlinkFieldDefinition fieldDefinition = compiledField.getFieldDefinition();
       AbstractMavlinkFieldCodec fieldCodec = compiledField.getFieldCodec();
       String fieldName = fieldDefinition.getName();
-
       int fieldSize = compiledField.getSizeInBytes();
 
-      // Base fields MUST be present
       if (!fieldDefinition.isExtension()) {
-        if (buffer.remaining() < fieldSize) {
-          throw new IOException(
-              "Payload too short for base field '" + fieldName +
-                  "' in message " + compiledMessage.getName() +
-                  " remaining=" + buffer.remaining() +
-                  " required=" + fieldSize
-          );
+        if (truncated || buffer.remaining() < fieldSize) {
+          truncated = true;
+          result.put(fieldName, zeroValue(fieldDefinition));
+          continue;
         }
       } else {
-        // Extension fields are optional: if not enough bytes left, treat as absent
-        if (buffer.remaining() < fieldSize) {
-          // you can either omit it or explicitly put null; your choice
+        // Extension fields: absent if not enough bytes (or if we've already truncated)
+        if (truncated || buffer.remaining() < fieldSize) {
           result.put(fieldName, null);
           continue;
         }
       }
 
+      // Normal decode path (enough bytes available)
       if (!fieldDefinition.isArray()) {
-        Object value = fieldCodec.decode(buffer);
-        result.put(fieldName, value);
+        result.put(fieldName, fieldCodec.decode(buffer));
         continue;
       }
 
       int len = fieldDefinition.getArrayLength();
-
       if (fieldDefinition.getWireType() == MavlinkWireType.CHAR) {
-        // MAVLink strings: fixed-size, null-terminated, null-padded
-        byte[] bytes;
-        String v = (String) fieldCodec.decode(buffer);   // codec returns Byte
-        bytes = v.getBytes(StandardCharsets.UTF_8);
-        int end = bytes.length;
-        while (end > 0 && bytes[end - 1] == 0) {
-          end--;
+        // read fixed-size char[N] bytes; codec may or may not do this correctly
+        byte[] raw = new byte[len];
+        buffer.get(raw);
+        int end = 0;
+        while (end < raw.length && raw[end] != 0) {
+          end++;
         }
-        String value = new String(bytes, 0, end, StandardCharsets.UTF_8);
-        result.put(fieldName, value);
+        result.put(fieldName, new String(raw, 0, end, StandardCharsets.UTF_8));
       } else {
         List<Object> values = new ArrayList<>(len);
         for (int i = 0; i < len; i++) {
@@ -112,4 +105,33 @@ public class MavlinkPayloadParser {
 
     return result;
   }
+
+  private Object zeroValue(MavlinkFieldDefinition fieldDefinition) {
+    if (!fieldDefinition.isArray()) {
+      // Scalars: 0 / 0.0 / false, etc.
+      return switch (fieldDefinition.getWireType()) {
+        case FLOAT, DOUBLE -> 0.0;
+        case CHAR -> ""; // should never happen for non-array in MAVLink, but safe
+        default -> 0L;   // ints: you can use Long universally in your map
+      };
+    }
+
+    int len = fieldDefinition.getArrayLength();
+
+    if (fieldDefinition.getWireType() == MavlinkWireType.CHAR) {
+      return "";
+    }
+
+    // Numeric arrays: list of zeros
+    List<Object> zeros = new ArrayList<>(len);
+    Object z = switch (fieldDefinition.getWireType()) {
+      case FLOAT, DOUBLE -> 0.0;
+      default -> 0L;
+    };
+    for (int i = 0; i < len; i++) {
+      zeros.add(z);
+    }
+    return zeros;
+  }
+
 }
