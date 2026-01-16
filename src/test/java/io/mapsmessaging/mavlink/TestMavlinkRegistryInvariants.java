@@ -19,10 +19,10 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledField;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
+import io.mapsmessaging.mavlink.message.CompiledField;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -34,11 +34,11 @@ class TestMavlinkRegistryInvariants {
   @Test
   void registryHasNoDuplicateMessageIdsAndLooksSane() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = MavlinkTestSupport.registry(codec);
+    MessageRegistry registry = MavlinkTestSupport.registry(codec);
 
     Assertions.assertEquals("common", codec.getName());
 
-    List<MavlinkCompiledMessage> messages = registry.getCompiledMessages();
+    List<CompiledMessage> messages = registry.getCompiledMessages();
     Assertions.assertNotNull(messages);
     Assertions.assertTrue(
         messages.size() >= 220 && messages.size() <= 260,
@@ -46,7 +46,7 @@ class TestMavlinkRegistryInvariants {
     );
 
     Set<Integer> ids = new HashSet<>();
-    for (MavlinkCompiledMessage message : messages) {
+    for (CompiledMessage message : messages) {
       Assertions.assertTrue(ids.add(message.getMessageId()), "Duplicate messageId: " + message.getMessageId());
       Assertions.assertNotNull(message.getName());
       Assertions.assertTrue(message.getPayloadSizeBytes() >= 0);
@@ -63,14 +63,14 @@ class TestMavlinkRegistryInvariants {
   @Test
   void compiledFieldLayoutIsMonotonicAndMatchesPayloadSize() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = MavlinkTestSupport.registry(codec);
+    MessageRegistry registry = MavlinkTestSupport.registry(codec);
 
-    for (MavlinkCompiledMessage message : registry.getCompiledMessages()) {
-      List<MavlinkCompiledField> fields = MavlinkTestSupport.fieldsSortedByOffset(message);
+    for (CompiledMessage message : registry.getCompiledMessages()) {
+      List<CompiledField> fields = MavlinkTestSupport.fieldsSortedByOffset(message);
 
       Set<String> names = new HashSet<>();
-      for (MavlinkCompiledField field : fields) {
-        MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(field);
+      for (CompiledField field : fields) {
+        FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(field);
 
         Assertions.assertTrue(
             names.add(fieldDefinition.getName()),
@@ -84,8 +84,8 @@ class TestMavlinkRegistryInvariants {
       }
 
       for (int i = 1; i < fields.size(); i++) {
-        MavlinkCompiledField previous = fields.get(i - 1);
-        MavlinkCompiledField current = fields.get(i);
+        CompiledField previous = fields.get(i - 1);
+        CompiledField current = fields.get(i);
 
         int previousEnd = MavlinkTestSupport.offset(previous) + MavlinkTestSupport.size(previous);
 
@@ -100,7 +100,7 @@ class TestMavlinkRegistryInvariants {
         );
       }
 
-      MavlinkCompiledField last = fields.get(fields.size() - 1);
+      CompiledField last = fields.get(fields.size() - 1);
       int computedPayloadSize = MavlinkTestSupport.offset(last) + MavlinkTestSupport.size(last);
 
       Assertions.assertEquals(
@@ -114,14 +114,14 @@ class TestMavlinkRegistryInvariants {
   @Test
   void extensionFieldsAreAllTrailingInPackedOrder() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = MavlinkTestSupport.registry(codec);
+    MessageRegistry registry = MavlinkTestSupport.registry(codec);
 
-    for (MavlinkCompiledMessage message : registry.getCompiledMessages()) {
-      List<MavlinkCompiledField> fields = message.getCompiledFields(); // assumes already in packed order
+    for (CompiledMessage message : registry.getCompiledMessages()) {
+      List<CompiledField> fields = message.getCompiledFields(); // assumes already in packed order
       boolean sawExtension = false;
 
-      for (MavlinkCompiledField field : fields) {
-        MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(field);
+      for (CompiledField field : fields) {
+        FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(field);
 
         if (fieldDefinition.isExtension()) {
           sawExtension = true;

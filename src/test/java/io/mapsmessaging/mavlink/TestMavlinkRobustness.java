@@ -20,7 +20,7 @@
 package io.mapsmessaging.mavlink;
 
 
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -81,7 +81,7 @@ class TestMavlinkRobustness {
     Assertions.assertNotNull(codec);
     Assertions.assertEquals("common", codec.getName());
 
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
     Assertions.assertNotNull(registry);
 
     assertTrue(registry.getCompiledMessagesById().containsKey(0), "HEARTBEAT");

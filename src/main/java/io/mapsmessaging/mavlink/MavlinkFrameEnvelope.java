@@ -19,13 +19,13 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkVersion;
+import io.mapsmessaging.mavlink.message.Version;
 import lombok.Value;
 
 @Value
 public class MavlinkFrameEnvelope {
 
-  MavlinkVersion version;
+  Version version;
   int messageId;
 
   int systemId;

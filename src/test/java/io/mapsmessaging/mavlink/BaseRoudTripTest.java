@@ -19,12 +19,12 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledField;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkEnumDefinition;
-import io.mapsmessaging.mavlink.message.fields.MavlinkEnumEntry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
+import io.mapsmessaging.mavlink.message.CompiledField;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.fields.EnumDefinition;
+import io.mapsmessaging.mavlink.message.fields.EnumEntry;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -49,18 +49,18 @@ class BaseRoudTripTest {
     protected RandomValueFactory() {}
 
     static Map<String, Object> buildValues(
-        MavlinkMessageRegistry registry,
-        MavlinkCompiledMessage msg,
+        MessageRegistry registry,
+        CompiledMessage msg,
         MavlinkRoundTripAllMessagesTest.ExtensionMode extensionMode,
         long baseSeed
     ) throws IOException {
 
       Map<String, Object> values = new LinkedHashMap<>();
-      List<MavlinkCompiledField> fields = msg.getCompiledFields();
+      List<CompiledField> fields = msg.getCompiledFields();
 
       for (int i = 0; i < fields.size(); i++) {
-        MavlinkCompiledField cf = fields.get(i);
-        MavlinkFieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
+        CompiledField cf = fields.get(i);
+        FieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
 
         if (fd.isExtension() && extensionMode == MavlinkRoundTripAllMessagesTest.ExtensionMode.OMIT_ALL) {
           continue;
@@ -82,9 +82,9 @@ class BaseRoudTripTest {
       return values;
     }
 
-    static MavlinkFieldDefinition fieldByName(MavlinkCompiledMessage msg, String fieldName) {
-      for (MavlinkCompiledField cf : msg.getCompiledFields()) {
-        MavlinkFieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
+    static FieldDefinition fieldByName(CompiledMessage msg, String fieldName) {
+      for (CompiledField cf : msg.getCompiledFields()) {
+        FieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
         if (fieldName.equals(fd.getName())) {
           return fd;
         }
@@ -93,9 +93,9 @@ class BaseRoudTripTest {
     }
 
     protected static Object generateValueForField(
-        MavlinkMessageRegistry registry,
+        MessageRegistry registry,
         int messageId,
-        MavlinkFieldDefinition fd,
+        FieldDefinition fd,
         int fieldIndex,
         long baseSeed
     ) throws IOException {
@@ -117,10 +117,10 @@ class BaseRoudTripTest {
       return generateScalar(registry, fd, random);
     }
 
-    protected static Object generateScalar(MavlinkMessageRegistry registry, MavlinkFieldDefinition fd, Random random) throws IOException {
+    protected static Object generateScalar(MessageRegistry registry, FieldDefinition fd, Random random) throws IOException {
       String enumName = fd.getEnumName();
       if (enumName != null && !enumName.isEmpty()) {
-        MavlinkEnumDefinition def = registry.getEnumsByName().get(enumName);
+        EnumDefinition def = registry.getEnumsByName().get(enumName);
         if (def != null && def.getEntries() != null && !def.getEntries().isEmpty()) {
           if (def.isBitmask()) {
             return pickBitmask(def, random);
@@ -155,25 +155,25 @@ class BaseRoudTripTest {
       };
     }
 
-    protected static long pickEnumValue(MavlinkEnumDefinition def, Random random) {
-      List<MavlinkEnumEntry> entries = def.getEntries();
-      MavlinkEnumEntry entry = entries.get(random.nextInt(entries.size()));
+    protected static long pickEnumValue(EnumDefinition def, Random random) {
+      List<EnumEntry> entries = def.getEntries();
+      EnumEntry entry = entries.get(random.nextInt(entries.size()));
       return entry.getValue();
     }
 
-    protected static long pickBitmask(MavlinkEnumDefinition def, Random random) {
-      List<MavlinkEnumEntry> entries = def.getEntries();
+    protected static long pickBitmask(EnumDefinition def, Random random) {
+      List<EnumEntry> entries = def.getEntries();
       int count = Math.min(entries.size(), 1 + random.nextInt(3));
       long mask = 0L;
 
       for (int i = 0; i < count; i++) {
-        MavlinkEnumEntry entry = entries.get(random.nextInt(entries.size()));
+        EnumEntry entry = entries.get(random.nextInt(entries.size()));
         mask |= entry.getValue();
       }
       return mask;
     }
 
-    protected static boolean isCharType(MavlinkFieldDefinition fd) {
+    protected static boolean isCharType(FieldDefinition fd) {
       String type = normalizeType(fd.getType());
       return "char".equals(type);
     }
@@ -253,10 +253,10 @@ class BaseRoudTripTest {
     protected ValueAssertions() {}
 
     static void assertFieldEquals(
-        MavlinkFieldDefinition fd,
+        FieldDefinition fd,
         Object expected,
         Object actual,
-        MavlinkCompiledMessage msg
+        CompiledMessage msg
     ) {
 
       String type = RandomValueFactory.normalizeType(fd.getType());

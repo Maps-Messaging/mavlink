@@ -25,7 +25,7 @@ import java.nio.ByteOrder;
 public class DoubleFieldCodec extends AbstractMavlinkFieldCodec {
 
   public DoubleFieldCodec() {
-    super(MavlinkWireType.DOUBLE);
+    super(WireType.DOUBLE);
   }
 
   @Override

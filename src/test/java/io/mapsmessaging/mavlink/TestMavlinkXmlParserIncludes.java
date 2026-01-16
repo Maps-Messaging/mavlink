@@ -34,11 +34,11 @@ class TestMavlinkXmlParserIncludes {
     try (InputStream stream = classLoader.getResourceAsStream("mavlink/common.xml")) {
       Assertions.assertNotNull(stream, "Missing resource mavlink/common.xml");
 
-      MavlinkXmlParser parser = new MavlinkXmlParser();
-      MavlinkDialectLoader loader = new MavlinkDialectLoader(parser);
+      XmlParser parser = new XmlParser();
+      DialectLoader loader = new DialectLoader(parser);
 
-      MavlinkIncludeResolver resolver = new ClasspathMavlinkIncludeResolver(classLoader, "mavlink");
-      MavlinkDialectDefinition dialect = loader.load("common", stream, resolver);
+      IncludeResolver resolver = new ClasspathIncludeResolver(classLoader, "mavlink");
+      DialectDefinition dialect = loader.load("common", stream, resolver);
 
       Assertions.assertNotNull(dialect);
       Assertions.assertEquals("common", dialect.getName());

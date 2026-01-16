@@ -25,7 +25,7 @@ import java.nio.ByteOrder;
 public class CharFieldCodec extends AbstractMavlinkFieldCodec {
 
   public CharFieldCodec() {
-    super(MavlinkWireType.CHAR);
+    super(WireType.CHAR);
   }
 
   @Override

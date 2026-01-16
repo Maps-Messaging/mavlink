@@ -19,7 +19,7 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkFrame;
+import io.mapsmessaging.mavlink.message.Frame;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -284,10 +284,10 @@ class HeartbeatTest {
 
     for (int i = 0; i < frames.size(); i++) {
       ByteBuffer input = ByteBuffer.wrap(toByteArray(frames.get(i)));
-      Optional<MavlinkFrame> frame = frameCodec.tryUnpackFrame(input);
+      Optional<Frame> frame = frameCodec.tryUnpackFrame(input);
 
       Assertions.assertTrue(frame.isPresent(), "Frame #" + i + " did not unpack. Remaining=" + input.remaining());
-      MavlinkFrame payloadFrame = frame.get();
+      Frame payloadFrame = frame.get();
       Map<String, Object> obj = payloadCodec.parsePayload(payloadFrame.getMessageId(), payloadFrame.getPayload());
       Assertions.assertTrue(!obj.isEmpty());
     }

@@ -19,10 +19,10 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledField;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
+import io.mapsmessaging.mavlink.message.CompiledField;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
 
 import java.lang.reflect.Field;
 import java.util.Comparator;
@@ -40,23 +40,23 @@ public final class MavlinkTestSupport {
     return loader.getDialectOrThrow("common");
   }
 
-  public static MavlinkMessageRegistry registry(MavlinkCodec codec) {
+  public static MessageRegistry registry(MavlinkCodec codec) {
     return codec.getRegistry();
   }
 
-  public static MavlinkFieldDefinition fieldDefinition(MavlinkCompiledField compiledField) {
+  public static FieldDefinition fieldDefinition(CompiledField compiledField) {
     try {
-      Field field = MavlinkCompiledField.class.getDeclaredField("fieldDefinition");
+      Field field = CompiledField.class.getDeclaredField("fieldDefinition");
       field.setAccessible(true);
-      return (MavlinkFieldDefinition) field.get(compiledField);
+      return (FieldDefinition) field.get(compiledField);
     } catch (Exception exception) {
       throw new IllegalStateException("Cannot access MavlinkCompiledField.fieldDefinition", exception);
     }
   }
 
-  public static int offset(MavlinkCompiledField compiledField) {
+  public static int offset(CompiledField compiledField) {
     try {
-      Field field = MavlinkCompiledField.class.getDeclaredField("offsetInPayload");
+      Field field = CompiledField.class.getDeclaredField("offsetInPayload");
       field.setAccessible(true);
       return (int) field.get(compiledField);
     } catch (Exception exception) {
@@ -64,9 +64,9 @@ public final class MavlinkTestSupport {
     }
   }
 
-  public static int size(MavlinkCompiledField compiledField) {
+  public static int size(CompiledField compiledField) {
     try {
-      Field field = MavlinkCompiledField.class.getDeclaredField("sizeInBytes");
+      Field field = CompiledField.class.getDeclaredField("sizeInBytes");
       field.setAccessible(true);
       return (int) field.get(compiledField);
     } catch (Exception exception) {
@@ -74,33 +74,33 @@ public final class MavlinkTestSupport {
     }
   }
 
-  public static Optional<MavlinkCompiledMessage> firstMessageWithExtensions(MavlinkMessageRegistry registry) {
+  public static Optional<CompiledMessage> firstMessageWithExtensions(MessageRegistry registry) {
     return registry.getCompiledMessages().stream()
         .filter(message -> message.getCompiledFields().stream().anyMatch(field -> fieldDefinition(field).isExtension()))
         .findFirst();
   }
 
-  public static Optional<MavlinkCompiledMessage> firstMessageWithArray(MavlinkMessageRegistry registry) {
+  public static Optional<CompiledMessage> firstMessageWithArray(MessageRegistry registry) {
     return registry.getCompiledMessages().stream()
         .filter(message -> message.getCompiledFields().stream().anyMatch(field -> fieldDefinition(field).isArray()))
         .findFirst();
   }
 
-  public static Optional<MavlinkCompiledMessage> firstMessageWithEnum(MavlinkMessageRegistry registry) {
+  public static Optional<CompiledMessage> firstMessageWithEnum(MessageRegistry registry) {
     return registry.getCompiledMessages().stream()
         .filter(message -> message.getCompiledFields().stream().anyMatch(field -> {
-          MavlinkFieldDefinition definition = fieldDefinition(field);
+          FieldDefinition definition = fieldDefinition(field);
           String enumName = definition.getEnumName();
           return enumName != null && !enumName.isEmpty();
         }))
         .findFirst();
   }
 
-  public static Map<String, Object> payloadWithScalar(MavlinkFieldDefinition field, Number value) {
+  public static Map<String, Object> payloadWithScalar(FieldDefinition field, Number value) {
     return Map.of(field.getName(), value);
   }
 
-  public static Map<String, Object> payloadWithArrayFilled(MavlinkFieldDefinition field, Number value) {
+  public static Map<String, Object> payloadWithArrayFilled(FieldDefinition field, Number value) {
     int arrayLength = field.getArrayLength();
     List<Number> list = java.util.stream.IntStream.range(0, arrayLength)
         .mapToObj(index -> value)
@@ -108,7 +108,7 @@ public final class MavlinkTestSupport {
     return Map.of(field.getName(), list);
   }
 
-  public static List<MavlinkCompiledField> fieldsSortedByOffset(MavlinkCompiledMessage message) {
+  public static List<CompiledField> fieldsSortedByOffset(CompiledMessage message) {
     return message.getCompiledFields().stream()
         .sorted(Comparator.comparingInt(MavlinkTestSupport::offset))
         .toList();

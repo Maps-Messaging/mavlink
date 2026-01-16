@@ -45,7 +45,7 @@ public class ArrayFieldCodec extends AbstractMavlinkFieldCodec {
   public Object decode(ByteBuffer buffer) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
 
-    if (treatAsString && getWireType() == MavlinkWireType.CHAR) {
+    if (treatAsString && getWireType() == WireType.CHAR) {
       byte[] temp = new byte[arrayLength];
       buffer.get(temp);
       int end = 0;
@@ -62,7 +62,7 @@ public class ArrayFieldCodec extends AbstractMavlinkFieldCodec {
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
 
-    if (treatAsString && getWireType() == MavlinkWireType.CHAR) {
+    if (treatAsString && getWireType() == WireType.CHAR) {
       String text = value == null ? "" : value.toString();
       byte[] bytes = text.getBytes();
       int length = Math.min(bytes.length, arrayLength);

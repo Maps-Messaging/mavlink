@@ -28,8 +28,9 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.schema.JsonSchemaBuilder;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
@@ -47,7 +48,7 @@ class MavlinkPayloadJsonSchemaValidationTest extends BaseRoudTripTest {
   @TestFactory
   Stream<DynamicTest> allMessages_payload_toJson_validatesAgainstSchema() throws Exception {
     MavlinkCodec payloadCodec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = payloadCodec.getRegistry();
+    MessageRegistry registry = payloadCodec.getRegistry();
 
     return registry.getCompiledMessages().stream()
         .map(msg -> DynamicTest.dynamicTest(
@@ -58,8 +59,8 @@ class MavlinkPayloadJsonSchemaValidationTest extends BaseRoudTripTest {
 
   private static void payloadToJsonValidates(
       MavlinkCodec payloadCodec,
-      MavlinkMessageRegistry registry,
-      MavlinkCompiledMessage msg
+      MessageRegistry registry,
+      CompiledMessage msg
   ) throws Exception {
 
     Map<String, Object> values =
@@ -75,7 +76,7 @@ class MavlinkPayloadJsonSchemaValidationTest extends BaseRoudTripTest {
 
     // Build schema for this message
     JsonObject schemaObject =
-        io.mapsmessaging.mavlink.schema.MavlinkJsonSchemaBuilder.buildSchema(msg, registry.getEnumsByName());
+        JsonSchemaBuilder.buildSchema(msg, registry.getEnumsByName());
 
     JsonSchema schema = compileSchema(schemaObject);
     Set<ValidationMessage> errors = schema.validate(toJsonNode(jsonObject));

@@ -19,41 +19,69 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkFrame;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.MavlinkVersion;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.Frame;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.Version;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
+import io.mapsmessaging.mavlink.signing.MapSigningKeyProvider;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
 
+  private static final byte[] TEST_SIGNING_KEY = buildTestSigningKey();
+
+  private static byte[] buildTestSigningKey() {
+    Random random = new Random();
+    byte[] key = new byte[32];
+    random.nextBytes(key);
+    return key;
+  }
+
   @TestFactory
-  Stream<DynamicTest> allMessages_frame_roundTrip_v2_fullPayload() throws Exception {
+  Stream<DynamicTest> allMessages_frame_roundTrip_v2_unsigned_fullPayload() throws Exception {
+    return buildRoundTripTests(false);
+  }
+
+  @TestFactory
+  Stream<DynamicTest> allMessages_frame_roundTrip_v2_signed_fullPayload() throws Exception {
+    return buildRoundTripTests(true);
+  }
+
+  private Stream<DynamicTest> buildRoundTripTests(boolean signFrames) throws Exception {
     MavlinkCodec payloadCodec = MavlinkTestSupport.codec();
-    MavlinkFrameCodec frameCodec = new MavlinkFrameCodec(payloadCodec);
-    MavlinkMessageRegistry registry = payloadCodec.getRegistry();
+
+
+    MapSigningKeyProvider signingKeyProvider = new MapSigningKeyProvider();
+    signingKeyProvider.register (1, 1, 0, TEST_SIGNING_KEY);
+    MavlinkFrameCodec frameCodec = new MavlinkFrameCodec(payloadCodec, signingKeyProvider);
+
+    MessageRegistry registry = payloadCodec.getRegistry();
+
+    String suffix = signFrames ? "signed" : "unsigned";
 
     return registry.getCompiledMessages().stream()
         .map(msg -> DynamicTest.dynamicTest(
-            msg.getMessageId() + " " + msg.getName(),
-            () -> frameRoundTripForMessageV2(frameCodec, payloadCodec, registry, msg)
+            msg.getMessageId() + " " + msg.getName() + " (" + suffix + ")",
+            () -> frameRoundTripForMessageV2(frameCodec, payloadCodec, registry, msg, signFrames)
         ));
   }
 
   private static void frameRoundTripForMessageV2(
       MavlinkFrameCodec frameCodec,
       MavlinkCodec payloadCodec,
-      MavlinkMessageRegistry registry,
-      MavlinkCompiledMessage msg
+      MessageRegistry registry,
+      CompiledMessage msg,
+      boolean signFrame
   ) throws Exception {
 
     Map<String, Object> values =
@@ -62,8 +90,8 @@ class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
     byte[] payload = payloadCodec.encodePayload(msg.getMessageId(), values);
     assertNotNull(payload);
 
-    MavlinkFrame frame = new MavlinkFrame();
-    frame.setVersion(MavlinkVersion.V2);
+    Frame frame = new Frame();
+    frame.setVersion(Version.V2);
     frame.setSequence(42);
     frame.setSystemId(1);
     frame.setComponentId(1);
@@ -71,8 +99,8 @@ class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
     frame.setPayload(payload);
     frame.setPayloadLength(payload.length);
 
-    frame.setSigned(false);
-    frame.setIncompatibilityFlags((byte) 0);
+    frame.setSigned(signFrame);
+    frame.setIncompatibilityFlags(signFrame ? (byte) 1 : (byte) 0);
     frame.setCompatibilityFlags((byte) 0);
     frame.setSignature(null);
 
@@ -84,10 +112,22 @@ class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
     ByteBuffer networkOwned = ByteBuffer.allocate(out.remaining() + 16);
     networkOwned.put(out);
     networkOwned.flip();
-    Optional<MavlinkFrame> decodedOpt = frameCodec.tryUnpackFrame(networkOwned);
+
+    Optional<Frame> decodedOpt = frameCodec.tryUnpackFrame(networkOwned);
     assertTrue(decodedOpt.isPresent(), "Expected to decode a frame");
 
-    MavlinkFrame decoded = decodedOpt.get();
+    Frame decoded = decodedOpt.get();
+
+    if (signFrame) {
+      assertTrue(decoded.isSigned(), "Expected signed frame");
+      assertTrue(decoded.isValidated(), "Expected signature validation to succeed");
+      assertNotNull(decoded.getSignature(), "Expected signature bytes");
+      assertEquals(13, decoded.getSignature().length, "Expected 13-byte MAVLink v2 signature block");
+    } else {
+      assertFalse(decoded.isSigned(), "Expected unsigned frame");
+      assertFalse(decoded.isValidated(), "Expected validated=false for unsigned frame");
+      assertNull(decoded.getSignature(), "Expected signature to be null for unsigned frame");
+    }
 
     assertEquals(frame.getVersion(), decoded.getVersion());
     assertEquals(frame.getSequence(), decoded.getSequence());
@@ -106,8 +146,8 @@ class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
       Object actual = output.get(fieldName);
       assertNotNull(actual, "Missing field after decode: " + fieldName);
 
-      MavlinkFieldDefinition fd = RandomValueFactory.fieldByName(msg, fieldName);
-      ValueAssertions.assertFieldEquals(fd, expected, actual, msg);
+      FieldDefinition fieldDefinition = RandomValueFactory.fieldByName(msg, fieldName);
+      ValueAssertions.assertFieldEquals(fieldDefinition, expected, actual, msg);
     }
   }
 }

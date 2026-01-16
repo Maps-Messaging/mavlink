@@ -25,7 +25,7 @@ import java.nio.ByteOrder;
 public class Int16FieldCodec extends AbstractMavlinkFieldCodec {
 
   public Int16FieldCodec() {
-    super(MavlinkWireType.INT16);
+    super(WireType.INT16);
   }
 
   @Override

@@ -19,10 +19,10 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledField;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
+import io.mapsmessaging.mavlink.message.CompiledField;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
@@ -38,7 +38,7 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
   @TestFactory
   Stream<DynamicTest> allMessages_baseFields_roundTrip() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
     return registry.getCompiledMessages().stream()
         .map(msg -> DynamicTest.dynamicTest(
@@ -50,7 +50,7 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
   @TestFactory
   Stream<DynamicTest> allMessages_extensions_omitted_vs_present_payloadSizing() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
     return registry.getCompiledMessages().stream()
         .filter(msg -> msg.getCompiledFields().stream().anyMatch(cf -> MavlinkTestSupport.fieldDefinition(cf).isExtension()))
@@ -63,7 +63,7 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
   @TestFactory
   Stream<DynamicTest> parallel_encode_decode_sanity_no_shared_state_per_message() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
     int threads = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
     int tasksPerMessage = 8; // tune: enough to shake shared state without being silly
@@ -77,8 +77,8 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
 
   private static void runParallelRoundTrips(
       MavlinkCodec codec,
-      MavlinkMessageRegistry registry,
-      MavlinkCompiledMessage msg,
+      MessageRegistry registry,
+      CompiledMessage msg,
       int threads,
       int tasksPerMessage
   ) throws Exception {
@@ -107,7 +107,7 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
               fail("Missing field after decode: message " + msg.getMessageId() + " (" + msg.getName() + ") field=" + fieldName);
             }
 
-            MavlinkFieldDefinition fd = RandomValueFactory.fieldByName(msg, fieldName);
+            FieldDefinition fd = RandomValueFactory.fieldByName(msg, fieldName);
             ValueAssertions.assertFieldEquals(fd, expected, actual, msg);
           }
           return null;
@@ -124,8 +124,8 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
   }
   private static void roundTripForMessage(
       MavlinkCodec codec,
-      MavlinkMessageRegistry registry,
-      MavlinkCompiledMessage msg,
+      MessageRegistry registry,
+      CompiledMessage msg,
       ExtensionMode extensionMode
   ) throws Exception {
 
@@ -150,15 +150,15 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
         fail("Missing field after decode for message " + msg.getMessageId() + " (" + msg.getName() + "): " + fieldName);
       }
 
-      MavlinkFieldDefinition fd = RandomValueFactory.fieldByName(msg, fieldName);
+      FieldDefinition fd = RandomValueFactory.fieldByName(msg, fieldName);
       ValueAssertions.assertFieldEquals(fd, expected, actual, msg);
     }
   }
 
   private static void extensionSizingForMessage(
       MavlinkCodec codec,
-      MavlinkMessageRegistry registry,
-      MavlinkCompiledMessage msg
+      MessageRegistry registry,
+      CompiledMessage msg
   ) throws Exception {
 
     int baseSize = PayloadSizing.computeBaseSize(msg);
@@ -181,7 +181,7 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
       Object actual = decoded.get(name);
       assertNotNull(actual, "Missing base field after extension decode: " + name);
 
-      MavlinkFieldDefinition fd = RandomValueFactory.fieldByName(msg, name);
+      FieldDefinition fd = RandomValueFactory.fieldByName(msg, name);
       ValueAssertions.assertFieldEquals(fd, expected, actual, msg);
     }
   }
@@ -195,10 +195,10 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
 
     private PayloadSizing() {}
 
-    static int computeBaseSize(MavlinkCompiledMessage msg) {
+    static int computeBaseSize(CompiledMessage msg) {
       int size = 0;
-      for (MavlinkCompiledField cf : msg.getCompiledFields()) {
-        MavlinkFieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
+      for (CompiledField cf : msg.getCompiledFields()) {
+        FieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
         if (fd.isExtension()) {
           break;
         }

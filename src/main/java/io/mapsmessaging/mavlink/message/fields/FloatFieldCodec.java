@@ -25,7 +25,7 @@ import java.nio.ByteOrder;
 public class FloatFieldCodec extends AbstractMavlinkFieldCodec {
 
   public FloatFieldCodec() {
-    super(MavlinkWireType.FLOAT);
+    super(WireType.FLOAT);
   }
 
   @Override

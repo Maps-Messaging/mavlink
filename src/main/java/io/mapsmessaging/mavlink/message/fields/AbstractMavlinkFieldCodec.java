@@ -24,13 +24,13 @@ import java.nio.ByteBuffer;
 
 public abstract class AbstractMavlinkFieldCodec {
 
-  private final MavlinkWireType wireType;
+  private final WireType wireType;
 
-  protected AbstractMavlinkFieldCodec(MavlinkWireType wireType) {
+  protected AbstractMavlinkFieldCodec(WireType wireType) {
     this.wireType = wireType;
   }
 
-  public MavlinkWireType getWireType() {
+  public WireType getWireType() {
     return wireType;
   }
 

@@ -20,12 +20,11 @@
 package io.mapsmessaging.mavlink;
 
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledField;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
-import io.mapsmessaging.mavlink.message.fields.MavlinkWireType;
-import org.junit.jupiter.api.Assertions;
+import io.mapsmessaging.mavlink.message.CompiledField;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
+import io.mapsmessaging.mavlink.message.fields.WireType;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -40,18 +39,18 @@ class TestMavlinkNumericArrays {
   @Test
   void numericArray_listShorterThanLength_zeroPadsRemainder() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
-    MavlinkCompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
+    CompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
         .orElseThrow(() -> new IllegalStateException("No message with array fields found"));
 
-    MavlinkCompiledField numericArray = findFirstNumericArrayField(message);
+    CompiledField numericArray = findFirstNumericArrayField(message);
     if (numericArray == null) {
       return;
     }
 
     int messageId = message.getMessageId();
-    MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(numericArray);
+    FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(numericArray);
 
     List<Number> shortList = List.of(1, 2);
 
@@ -71,18 +70,18 @@ class TestMavlinkNumericArrays {
   @Test
   void numericArray_listLongerThanLength_isTruncated() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
-    MavlinkCompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
+    CompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
         .orElseThrow(() -> new IllegalStateException("No message with array fields found"));
 
-    MavlinkCompiledField numericArray = findFirstNumericArrayField(message);
+    CompiledField numericArray = findFirstNumericArrayField(message);
     if (numericArray == null) {
       return;
     }
 
     int messageId = message.getMessageId();
-    MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(numericArray);
+    FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(numericArray);
 
     int length = fieldDefinition.getArrayLength();
 
@@ -102,16 +101,16 @@ class TestMavlinkNumericArrays {
     assertNotNull(decoded.get(fieldDefinition.getName()));
   }
 
-  private MavlinkCompiledField findFirstNumericArrayField(MavlinkCompiledMessage message) {
-    for (MavlinkCompiledField compiledField : message.getCompiledFields()) {
-      MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
+  private CompiledField findFirstNumericArrayField(CompiledMessage message) {
+    for (CompiledField compiledField : message.getCompiledFields()) {
+      FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
       if (!fieldDefinition.isArray()) {
         continue;
       }
       if (fieldDefinition.getWireType() == null) {
         continue;
       }
-      if (fieldDefinition.getWireType() == MavlinkWireType.CHAR) {
+      if (fieldDefinition.getWireType() == WireType.CHAR) {
         continue;
       }
       return compiledField;

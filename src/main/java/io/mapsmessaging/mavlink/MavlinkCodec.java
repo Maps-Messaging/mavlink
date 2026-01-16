@@ -19,9 +19,9 @@
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.codec.MavlinkPayloadPacker;
-import io.mapsmessaging.mavlink.codec.MavlinkPayloadParser;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
+import io.mapsmessaging.mavlink.codec.PayloadPacker;
+import io.mapsmessaging.mavlink.codec.PayloadParser;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
 import lombok.Getter;
 
 import java.io.IOException;
@@ -38,7 +38,7 @@ import java.util.Objects;
  * see {@link MavlinkFrameCodec}.</p>
  *
  * <p>Each instance is bound to a single dialect via its
- * {@link MavlinkMessageRegistry}.</p>
+ * {@link MessageRegistry}.</p>
  */
 public final class MavlinkCodec {
 
@@ -52,10 +52,10 @@ public final class MavlinkCodec {
    * Compiled message registry for the dialect.
    */
   @Getter
-  private final MavlinkMessageRegistry registry;
+  private final MessageRegistry registry;
 
-  private final MavlinkPayloadPacker payloadPacker;
-  private final MavlinkPayloadParser payloadParser;
+  private final PayloadPacker payloadPacker;
+  private final PayloadParser payloadParser;
 
   /**
    * Creates a payload codec for a specific MAVLink dialect.
@@ -68,9 +68,9 @@ public final class MavlinkCodec {
    */
   public MavlinkCodec(
       String name,
-      MavlinkMessageRegistry registry,
-      MavlinkPayloadPacker payloadPacker,
-      MavlinkPayloadParser payloadParser
+      MessageRegistry registry,
+      PayloadPacker payloadPacker,
+      PayloadParser payloadParser
   ) {
     this.name = Objects.requireNonNull(name, "name");
     this.registry = Objects.requireNonNull(registry, "registry");
