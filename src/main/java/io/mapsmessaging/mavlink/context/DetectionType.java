@@ -1,0 +1,12 @@
+package io.mapsmessaging.mavlink.context;
+
+public enum DetectionType {
+  SEQ_DUPLICATE,
+  SEQ_REORDER,
+  SEQ_GAP,
+  SEQ_RESET_SUSPECTED,
+  SEQ_SUSPICIOUS_BACKWARDS,
+  SEQ_SAME_SEQ_DIFFERENT_FINGERPRINT,
+  SYSTEM_MULTI_SOURCE_ACTIVE,
+  FRAME_INVALID
+}
