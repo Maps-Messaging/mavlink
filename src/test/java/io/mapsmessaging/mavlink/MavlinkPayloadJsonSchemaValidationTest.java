@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright [ 2020 - 2024 ] Matthew Buckton
  *  Copyright [ 2024 - 2026 ] MapsMessaging B.V.
  *
@@ -10,11 +9,13 @@
  *      http://www.apache.org/licenses/LICENSE-2.0
  *      https://commonsclause.com/
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ *
  */
 
 package io.mapsmessaging.mavlink;
@@ -28,6 +29,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
+import io.mapsmessaging.mavlink.codec.MavlinkCodec;
 import io.mapsmessaging.mavlink.message.CompiledMessage;
 import io.mapsmessaging.mavlink.message.MessageRegistry;
 import io.mapsmessaging.mavlink.schema.JsonSchemaBuilder;
