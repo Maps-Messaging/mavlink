@@ -19,6 +19,7 @@
 
 package io.mapsmessaging.mavlink;
 
+import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.mapsmessaging.mavlink.message.CompiledMessage;
 import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.MessageRegistry;
@@ -120,12 +121,12 @@ class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
 
     if (signFrame) {
       assertTrue(decoded.isSigned(), "Expected signed frame");
-      assertTrue(decoded.isValidated(), "Expected signature validation to succeed");
+      assertEquals(FrameFailureReason.OK, decoded.getValidated(),  "Expected signature validation to succeed");
       assertNotNull(decoded.getSignature(), "Expected signature bytes");
       assertEquals(13, decoded.getSignature().length, "Expected 13-byte MAVLink v2 signature block");
     } else {
       assertFalse(decoded.isSigned(), "Expected unsigned frame");
-      assertFalse(decoded.isValidated(), "Expected validated=false for unsigned frame");
+      assertNotEquals(FrameFailureReason.OK, decoded.getValidated(),  "Expected validated=false for unsigned frame");
       assertNull(decoded.getSignature(), "Expected signature to be null for unsigned frame");
     }
 

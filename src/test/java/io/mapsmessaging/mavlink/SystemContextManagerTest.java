@@ -184,7 +184,7 @@ class SystemContextManagerTest {
     frame.setPayloadLength(payload == null ? 0 : payload.length);
     frame.setChecksum(0);
     frame.setSigned(false);
-    frame.setValidated(true);
+    frame.setValidated(FrameFailureReason.OK);
     return frame;
   }
 

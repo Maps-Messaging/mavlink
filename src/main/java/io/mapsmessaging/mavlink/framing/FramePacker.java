@@ -19,6 +19,7 @@
 
 package io.mapsmessaging.mavlink.framing;
 
+import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.Version;
 
@@ -190,7 +191,7 @@ public final class FramePacker {
     frame.setChecksum(checksum);
     frame.setIncompatibilityFlags(incompatibilityFlags);
     frame.setSignature(signature);
-    frame.setValidated(signed);
+    frame.setValidated(FrameFailureReason.OK);
   }
   private static void requireRemaining(ByteBuffer out, int required) {
     if (out.remaining() < required) {

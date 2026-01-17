@@ -116,6 +116,9 @@ public final class V2FrameHandler implements FrameHandler {
           validated = FrameFailureReason.SIGNATURE_FAILED;
         }
       }
+      else{
+        validated = FrameFailureReason.UNSIGNED;
+      }
     }
     Frame frame = new Frame();
     frame.setVersion(Version.V2);

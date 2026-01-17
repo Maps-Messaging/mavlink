@@ -6,5 +6,6 @@ public enum FrameFailureReason {
   SIGNATURE_FAILED,
   CRC_AND_SIGNATURE_FAILED,
   MALFORMED,
+  UNSIGNED,
   UNKNOWN
 }
