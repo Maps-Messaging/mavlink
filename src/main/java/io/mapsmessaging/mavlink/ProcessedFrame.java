@@ -9,6 +9,7 @@ import java.util.Map;
 
 @Value
 public class ProcessedFrame {
+  String messageName;
   Frame frame;
   Map<String, Object> fields;
   boolean valid;

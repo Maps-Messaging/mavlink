@@ -2,6 +2,7 @@ package io.mapsmessaging.mavlink;
 
 import io.mapsmessaging.mavlink.context.Detection;
 import io.mapsmessaging.mavlink.context.FrameFailureReason;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
 import io.mapsmessaging.mavlink.message.Frame;
 
 import java.io.IOException;
@@ -41,10 +42,15 @@ public class MavlinkEventFactory {
     }
     Frame frame = frameOptional.get();
     FrameFailureReason failureReason = frame.getValidated();
+    Map<String, Object> fields = frameCodec.parsePayload(frame);
+    String name = "";
+    CompiledMessage message = frameCodec.getRegistry().getCompiledMessagesById().get(frame.getMessageId());
+    if(message != null){
+      name = message.getName();
+    }
     if (failureReason == FrameFailureReason.OK) {
       List<Detection> detectionList = systemContextManager.onValidatedFrame(frame, streamName, timestamp);
-      Map<String, Object> fields = frameCodec.parsePayload(frame);
-      return Optional.of(new ProcessedFrame(frame, fields, true, detectionList));
+      return Optional.of(new ProcessedFrame(name, frame, fields, true, detectionList));
     }
     List<Detection> detectionList = systemContextManager.onInvalidFrame(
         frame.getSystemId(),
@@ -52,7 +58,7 @@ public class MavlinkEventFactory {
         timestamp,
         failureReason
     );
-    return Optional.of(new ProcessedFrame(frame, Map.of(), false, detectionList));
+    return Optional.of(new ProcessedFrame(name, frame, Map.of(), false, detectionList));
   }
 
 
