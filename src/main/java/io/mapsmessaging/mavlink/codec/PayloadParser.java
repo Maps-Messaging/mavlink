@@ -45,8 +45,7 @@ public class PayloadParser {
   }
 
   public Map<String, Object> parsePayload(int messageId, byte[] payload) throws IOException {
-    CompiledMessage compiledMessage =
-        messageRegistry.getCompiledMessagesById().get(messageId);
+    CompiledMessage compiledMessage = messageRegistry.getCompiledMessagesById().get(messageId);
     if (compiledMessage == null) {
       throw new IllegalArgumentException("Unknown MAVLink message id: " + messageId);
     }

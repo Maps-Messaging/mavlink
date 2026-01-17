@@ -19,6 +19,7 @@
 
 package io.mapsmessaging.mavlink.message;
 
+import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -129,9 +130,9 @@ public class Frame {
 
   @Schema(
       description = "True if CRC and (if present) signature validation succeeded",
-      example = "true",
+      example = "OK",
       requiredMode = Schema.RequiredMode.REQUIRED,
-      defaultValue = "false"
+      defaultValue = "OK"
   )
-  private boolean validated = false;
+  private FrameFailureReason validated = FrameFailureReason.OK;
 }

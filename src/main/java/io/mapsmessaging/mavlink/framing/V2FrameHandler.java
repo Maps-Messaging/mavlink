@@ -19,6 +19,7 @@
 
 package io.mapsmessaging.mavlink.framing;
 
+import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.Version;
 
@@ -66,6 +67,8 @@ public final class V2FrameHandler implements FrameHandler {
 
   @Override
   public Optional<Frame> tryDecode(ByteBuffer candidateFrame) {
+    FrameFailureReason validated = FrameFailureReason.OK;
+
     int frameStartIndex = candidateFrame.position();
 
     int stx = candidateFrame.get(frameStartIndex) & 0xFF;
@@ -98,26 +101,22 @@ public final class V2FrameHandler implements FrameHandler {
     int crcExtra = dialectRegistry.crcExtra(Version.V2, messageId);
     int checksum = CrcHelper.computeChecksumFromWritten(candidateFrame, frameStartIndex+1, (HEADER_LENGTH-1) + payloadLength, crcExtra);
 
-    if (checksum != receivedChecksum) {
-      return Optional.empty();
-    }
-
-    byte[] payload = ByteBufferUtils.copyBytes(candidateFrame, payloadStartIndex, payloadLength);
-
+    byte[] payload = new byte[0];
     byte[] signature = null;
-    boolean validated = false;
-    if (signed) {
-      int signatureStartIndex = crcStartIndex + CRC_LENGTH;
-      signature = ByteBufferUtils.copyBytes(candidateFrame, signatureStartIndex, SIGNATURE_LENGTH);
-      if (signingKeyProvider.canValidate()) {
-        if (!validateSignature(candidateFrame, frameStartIndex, crcStartIndex, systemId, componentId, signature)) {
-          return Optional.empty();
-        } else {
-          validated = true;
+    if (checksum != receivedChecksum) {
+      validated = FrameFailureReason.CRC_FAILED;
+    }
+    else {
+      payload = ByteBufferUtils.copyBytes(candidateFrame, payloadStartIndex, payloadLength);
+      if (signed) {
+        int signatureStartIndex = crcStartIndex + CRC_LENGTH;
+        signature = ByteBufferUtils.copyBytes(candidateFrame, signatureStartIndex, SIGNATURE_LENGTH);
+        if (signingKeyProvider.canValidate() &&
+            !validateSignature(candidateFrame, frameStartIndex, crcStartIndex, systemId, componentId, signature)) {
+          validated = FrameFailureReason.SIGNATURE_FAILED;
         }
       }
     }
-
     Frame frame = new Frame();
     frame.setVersion(Version.V2);
     frame.setSequence(sequence);
@@ -132,7 +131,6 @@ public final class V2FrameHandler implements FrameHandler {
     frame.setCompatibilityFlags(compatibilityFlags);
     frame.setSignature(signature);
     frame.setValidated(validated);
-
     return Optional.of(frame);
   }
 

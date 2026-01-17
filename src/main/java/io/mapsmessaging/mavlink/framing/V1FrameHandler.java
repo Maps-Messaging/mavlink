@@ -19,6 +19,7 @@
 
 package io.mapsmessaging.mavlink.framing;
 
+import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.Version;
 import io.mapsmessaging.mavlink.message.X25Crc;
@@ -81,8 +82,9 @@ public final class V1FrameHandler implements FrameHandler {
 
     int crcExtra = dialectRegistry.crcExtra(Version.V1, messageId);
     int computedChecksum = CrcHelper.computeChecksumFromWritten(candidateFrame, frameStartIndex + 1, (HEADER_LENGTH) + payloadLength-1, crcExtra);
+    FrameFailureReason v = FrameFailureReason.OK;
     if (computedChecksum != receivedChecksum) {
-      return Optional.empty();
+      v = FrameFailureReason.CRC_FAILED;
     }
 
     byte[] payload = ByteBufferUtils.copyBytes(candidateFrame, payloadStartIndex, payloadLength);
@@ -100,6 +102,7 @@ public final class V1FrameHandler implements FrameHandler {
     frame.setIncompatibilityFlags((byte) 0);
     frame.setCompatibilityFlags((byte) 0);
     frame.setSignature(null);
+    frame.setValidated(v);
 
     return Optional.of(frame);
   }
