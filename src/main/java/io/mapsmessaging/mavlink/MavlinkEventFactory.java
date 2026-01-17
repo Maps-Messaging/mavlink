@@ -48,7 +48,7 @@ public class MavlinkEventFactory {
     if(message != null){
       name = message.getName();
     }
-    if (failureReason == FrameFailureReason.OK) {
+    if (failureReason == FrameFailureReason.OK || failureReason == FrameFailureReason.UNSIGNED) {
       List<Detection> detectionList = systemContextManager.onValidatedFrame(frame, streamName, timestamp);
       return Optional.of(new ProcessedFrame(name, frame, fields, true, detectionList));
     }
