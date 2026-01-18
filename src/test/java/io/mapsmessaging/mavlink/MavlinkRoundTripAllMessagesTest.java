@@ -34,7 +34,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
+public class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
 
 
   @TestFactory
@@ -188,7 +188,7 @@ class MavlinkRoundTripAllMessagesTest extends BaseRoudTripTest {
     }
   }
 
-  enum ExtensionMode {
+  public enum ExtensionMode {
     OMIT_ALL,
     SOME_PRESENT
   }
