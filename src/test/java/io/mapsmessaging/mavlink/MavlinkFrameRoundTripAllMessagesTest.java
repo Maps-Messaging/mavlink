@@ -23,19 +23,20 @@ package io.mapsmessaging.mavlink;
 import io.mapsmessaging.mavlink.codec.MavlinkCodec;
 import io.mapsmessaging.mavlink.codec.MavlinkFrameCodec;
 import io.mapsmessaging.mavlink.context.FrameFailureReason;
+import io.mapsmessaging.mavlink.framing.SigningKeyProvider;
 import io.mapsmessaging.mavlink.message.CompiledMessage;
 import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.MessageRegistry;
 import io.mapsmessaging.mavlink.message.Version;
 import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
 import io.mapsmessaging.mavlink.signing.MapSigningKeyProvider;
+import io.mapsmessaging.mavlink.signing.NoSigningKeyProvider;
+import io.mapsmessaging.mavlink.signing.StaticSigningKeyProvider;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -57,27 +58,90 @@ class MavlinkFrameRoundTripAllMessagesTest extends BaseRoudTripTest {
   }
 
   @TestFactory
-  Stream<DynamicTest> allMessages_frame_roundTrip_v2_signed_fullPayload() throws Exception {
+  Stream<DynamicTest> allMessages_frame_roundTrip_v2_unsigned_fullPayload_allSigningProviders() throws Exception {
+    return buildRoundTripTests(false);
+  }
+
+  @TestFactory
+  Stream<DynamicTest> allMessages_frame_roundTrip_v2_signed_fullPayload_allSigningProviders() throws Exception {
     return buildRoundTripTests(true);
   }
 
   private Stream<DynamicTest> buildRoundTripTests(boolean signFrames) throws Exception {
     MavlinkCodec payloadCodec = MavlinkTestSupport.codec();
-
-
-    MapSigningKeyProvider signingKeyProvider = new MapSigningKeyProvider();
-    signingKeyProvider.register (1, 1, 0, TEST_SIGNING_KEY);
-    MavlinkFrameCodec frameCodec = new MavlinkFrameCodec(payloadCodec, signingKeyProvider);
-
     MessageRegistry registry = payloadCodec.getRegistry();
 
-    String suffix = signFrames ? "signed" : "unsigned";
+    List<SigningProviderCase> signingProviderCases = buildSigningProviderCases(signFrames);
 
-    return registry.getCompiledMessages().stream()
-        .map(msg -> DynamicTest.dynamicTest(
-            msg.getMessageId() + " " + msg.getName() + " (" + suffix + ")",
-            () -> frameRoundTripForMessageV2(frameCodec, payloadCodec, registry, msg, signFrames)
-        ));
+    String signingSuffix = signFrames ? "signed" : "unsigned";
+
+    return signingProviderCases.stream()
+        .flatMap(signingProviderCase -> registry.getCompiledMessages().stream()
+            .map(message -> DynamicTest.dynamicTest(
+                message.getMessageId()
+                    + " "
+                    + message.getName()
+                    + " ("
+                    + signingSuffix
+                    + ", "
+                    + signingProviderCase.displayName
+                    + ")",
+                () -> runRoundTripCase(payloadCodec, registry, message, signFrames, signingProviderCase)
+            )));
+  }
+
+  private void runRoundTripCase(
+      MavlinkCodec payloadCodec,
+      MessageRegistry registry,
+      CompiledMessage message,
+      boolean signFrames,
+      SigningProviderCase signingProviderCase
+  ) throws Exception {
+
+    MavlinkFrameCodec frameCodec = new MavlinkFrameCodec(payloadCodec, signingProviderCase.signingKeyProvider);
+
+    if (signingProviderCase.expectSuccess) {
+      frameRoundTripForMessageV2(frameCodec, payloadCodec, registry, message, signFrames);
+      return;
+    }
+
+    assertThrows(
+        Exception.class,
+        () -> frameRoundTripForMessageV2(frameCodec, payloadCodec, registry, message, signFrames),
+        "Expected failure for " + signingProviderCase.displayName + " when signFrames=" + signFrames
+    );
+  }
+
+  private List<SigningProviderCase> buildSigningProviderCases(boolean signFrames) {
+    List<SigningProviderCase> signingProviderCases = new ArrayList<>();
+
+    MapSigningKeyProvider mapSigningKeyProvider = new MapSigningKeyProvider();
+    mapSigningKeyProvider.register(1, 1, 0, TEST_SIGNING_KEY);
+
+    SigningKeyProvider staticSigningKeyProvider = new StaticSigningKeyProvider(TEST_SIGNING_KEY);
+
+    SigningKeyProvider noSigningKeyProvider = new NoSigningKeyProvider();
+
+    signingProviderCases.add(new SigningProviderCase("MapSigningKeyProvider", mapSigningKeyProvider, true));
+    signingProviderCases.add(new SigningProviderCase("StaticSigningKeyProvider", staticSigningKeyProvider, true));
+
+    boolean noSigningKeyProviderShouldSucceed = !signFrames;
+    signingProviderCases.add(new SigningProviderCase("NoSigningKeyProvider", noSigningKeyProvider, noSigningKeyProviderShouldSucceed));
+
+    return signingProviderCases;
+  }
+
+  private static final class SigningProviderCase {
+
+    private final String displayName;
+    private final SigningKeyProvider signingKeyProvider;
+    private final boolean expectSuccess;
+
+    private SigningProviderCase(String displayName, SigningKeyProvider signingKeyProvider, boolean expectSuccess) {
+      this.displayName = displayName;
+      this.signingKeyProvider = signingKeyProvider;
+      this.expectSuccess = expectSuccess;
+    }
   }
 
   private static void frameRoundTripForMessageV2(
