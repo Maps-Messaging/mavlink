@@ -30,6 +30,7 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -128,7 +129,7 @@ public final class MavlinkMessageFormatLoader {
    * @throws ParserConfigurationException if the XML parser cannot be configured
    * @throws SAXException if the dialect XML is invalid
    */
-  protected MavlinkCodec loadDialectFromClasspath(String dialectName, String classpathXml)
+  private MavlinkCodec loadDialectFromClasspath(String dialectName, String classpathXml)
       throws IOException, ParserConfigurationException, SAXException {
 
     String normalizedDialectName = normalizeDialectName(dialectName);
@@ -142,13 +143,23 @@ public final class MavlinkMessageFormatLoader {
       XmlParser mavlinkXmlParser = new XmlParser();
       DialectLoader dialectLoader = new DialectLoader(mavlinkXmlParser);
 
-      IncludeResolver includeResolver =
-          new ClasspathIncludeResolver(classLoader, "mavlink");
+      IncludeResolver includeResolver = new ClasspathIncludeResolver(classLoader, "mavlink");
 
       DialectDefinition dialectDefinition =
           dialectLoader.load(normalizedDialectName, inputStream, includeResolver);
 
       return buildCodec(normalizedDialectName, dialectDefinition);
+    }
+  }
+
+  public MavlinkCodec loadDialect(Path dialectName) throws IOException, ParserConfigurationException, SAXException {
+    Path base = java.nio.file.Files.isRegularFile(dialectName) ? dialectName.getParent() : dialectName;
+    FilePathIncludeResolver resolver = new FilePathIncludeResolver(base);
+    try(InputStream inputStream = java.nio.file.Files.newInputStream(dialectName)){
+      String fileName = dialectName.getFileName().toString();
+      int dot = fileName.lastIndexOf('.');
+      String dialect = (dot > 0) ? fileName.substring(0, dot) : fileName;
+      return loadDialect(dialect, inputStream, resolver);
     }
   }
 
@@ -176,9 +187,7 @@ public final class MavlinkMessageFormatLoader {
     XmlParser mavlinkXmlParser = new XmlParser();
     DialectLoader dialectLoader = new DialectLoader(mavlinkXmlParser);
 
-    DialectDefinition dialectDefinition =
-        dialectLoader.load(normalizedDialectName, inputStream, includeResolver);
-
+    DialectDefinition dialectDefinition = dialectLoader.load(normalizedDialectName, inputStream, includeResolver);
     MavlinkCodec codec = buildCodec(normalizedDialectName, dialectDefinition);
     dialects.put(normalizedDialectName, codec);
 

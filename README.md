@@ -22,6 +22,7 @@ It **does**:
 - Compile message definitions into an immutable registry
 - Encode Java field maps into MAVLink payload bytes
 - Decode MAVLink payload bytes into typed field maps
+- Provides ability to sign and validate V2 messages
 - Correctly handle MAVLink field ordering, arrays, enums, and extensions
 - Creates JsonSchemas to match the fields that it parses to and from
 
@@ -29,11 +30,6 @@ It **does not**:
 
 - Manage system IDs, component IDs, or sequence numbers
 - Implement any transport (UART, UDP, TCP, etc.)
-
-Frame parsing, CRC handling, and framing are provided by the framework layer
-built on top of this codec.
-
-This library is designed to sit **under** a framing and transport layer.
 
 ---
 

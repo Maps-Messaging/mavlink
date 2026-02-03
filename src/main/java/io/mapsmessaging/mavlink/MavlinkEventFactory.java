@@ -26,9 +26,12 @@ import io.mapsmessaging.mavlink.context.Detection;
 import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.mapsmessaging.mavlink.message.CompiledMessage;
 import io.mapsmessaging.mavlink.message.Frame;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,15 +42,26 @@ public class MavlinkEventFactory {
   private SystemContextManager systemContextManager;
 
   public MavlinkEventFactory() throws IOException {
-    Optional<MavlinkCodec> codec = MavlinkMessageFormatLoader.getInstance().getDialect("common");
+    this("common");
+  }
+
+  public MavlinkEventFactory(String dialectName) throws IOException {
+    Optional<MavlinkCodec> codec = MavlinkMessageFormatLoader.getInstance().getDialect(dialectName);
     if (codec.isPresent()) {
       MavlinkCodec codecInstance = codec.get();
       frameCodec = new MavlinkFrameCodec(codecInstance);
       systemContextManager = new SystemContextManager();
     }
     else{
-      throw new IOException("Mavlink default common codec not found");
+      throw new IOException("Mavlink "+dialectName+" codec not found");
     }
+  }
+
+
+  public MavlinkEventFactory(Path dialectPath) throws IOException, ParserConfigurationException, SAXException {
+    MavlinkCodec codec = MavlinkMessageFormatLoader.getInstance().loadDialect(dialectPath);
+    frameCodec = new MavlinkFrameCodec(codec);
+    systemContextManager = new SystemContextManager();
   }
 
   public MavlinkEventFactory(MavlinkFrameCodec frameCodec, SystemContextManager systemContextManager){
