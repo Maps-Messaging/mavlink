@@ -34,8 +34,9 @@ built on top of this codec.
 
 This library is designed to sit **under** a framing and transport layer.
 
-Whant to know more? https://deepwiki.com/badge-maker?url=https%3A%2F%2Fdeepwiki.com%2FMaps-Messaging%2Fmavlink
-
+Whant to know more?
+ 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Maps-Messaging/mavlink)
 ---
 
 ## Features
