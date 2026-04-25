@@ -166,7 +166,12 @@ public class XmlParser {
 
     String valueAttribute = entryElement.getAttribute("value");
     if (valueAttribute != null && !valueAttribute.isEmpty()) {
-      entry.setValue(Long.parseLong(valueAttribute));
+      if(valueAttribute.toLowerCase().contains("x")){
+        entry.setValue(Long.decode(valueAttribute));
+      }
+      else{
+        entry.setValue(Long.parseLong(valueAttribute));
+      }
     }
 
     entry.setName(entryElement.getAttribute("name"));
