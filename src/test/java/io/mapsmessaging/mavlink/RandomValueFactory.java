@@ -36,56 +36,66 @@ import java.util.Random;
 
 public class RandomValueFactory {
 
-  protected RandomValueFactory() {}
+  protected RandomValueFactory() {
+  }
 
   public static Map<String, Object> buildValues(
       MessageRegistry registry,
-      CompiledMessage msg,
+      CompiledMessage message,
       MavlinkRoundTripAllMessagesTest.ExtensionMode extensionMode,
       long baseSeed
   ) throws IOException {
 
     Map<String, Object> values = new LinkedHashMap<>();
-    List<CompiledField> fields = msg.getCompiledFields();
+    List<CompiledField> fields = message.getCompiledFields();
 
-    for (int i = 0; i < fields.size(); i++) {
-      CompiledField cf = fields.get(i);
-      FieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
+    for (int fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++) {
+      CompiledField compiledField = fields.get(fieldIndex);
+      FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
 
-      if (fd.isExtension() && extensionMode == MavlinkRoundTripAllMessagesTest.ExtensionMode.OMIT_ALL) {
+      if (fieldDefinition.isExtension() && extensionMode == MavlinkRoundTripAllMessagesTest.ExtensionMode.OMIT_ALL) {
         continue;
       }
 
-      if (fd.isExtension() && extensionMode == MavlinkRoundTripAllMessagesTest.ExtensionMode.SOME_PRESENT) {
-        // include some extensions deterministically (not all)
-        long seed = perFieldSeed(baseSeed, msg.getMessageId(), i);
+      if (fieldDefinition.isExtension() && extensionMode == MavlinkRoundTripAllMessagesTest.ExtensionMode.SOME_PRESENT) {
+        long seed = perFieldSeed(baseSeed, message.getMessageId(), fieldIndex);
         Random random = new Random(seed);
+
         if (random.nextInt(100) < 60) {
-          continue; // omit ~60% of extension fields
+          continue;
         }
       }
 
-      Object value = generateValueForField(registry, msg.getMessageId(), fd, i, baseSeed);
-      values.put(fd.getName(), value);
+      Object value = generateValueForField(
+          registry,
+          message.getMessageId(),
+          fieldDefinition,
+          fieldIndex,
+          baseSeed
+      );
+
+      values.put(fieldDefinition.getName(), value);
     }
 
     return values;
   }
 
-  static FieldDefinition fieldByName(CompiledMessage msg, String fieldName) {
-    for (CompiledField cf : msg.getCompiledFields()) {
-      FieldDefinition fd = MavlinkTestSupport.fieldDefinition(cf);
-      if (fieldName.equals(fd.getName())) {
-        return fd;
+  static FieldDefinition fieldByName(CompiledMessage message, String fieldName) {
+    for (CompiledField compiledField : message.getCompiledFields()) {
+      FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
+
+      if (fieldName.equals(fieldDefinition.getName())) {
+        return fieldDefinition;
       }
     }
-    throw new IllegalStateException("Unknown field '" + fieldName + "' in message " + msg.getMessageId());
+
+    throw new IllegalStateException("Unknown field '" + fieldName + "' in message " + message.getMessageId());
   }
 
   protected static Object generateValueForField(
       MessageRegistry registry,
       int messageId,
-      FieldDefinition fd,
+      FieldDefinition fieldDefinition,
       int fieldIndex,
       long baseSeed
   ) throws IOException {
@@ -93,34 +103,52 @@ public class RandomValueFactory {
     long seed = perFieldSeed(baseSeed, messageId, fieldIndex);
     Random random = new Random(seed);
 
-    if (fd.isArray()) {
-      if (isCharType(fd)) {
-        return randomAsciiString(fd.getArrayLength(), messageId, fd.getName(), random);
+    if (fieldDefinition.isArray()) {
+      if (isCharType(fieldDefinition)) {
+        return randomAsciiString(fieldDefinition.getArrayLength(), messageId, fieldDefinition.getName(), random);
       }
-      Object[] arr = new Object[fd.getArrayLength()];
-      for (int i = 0; i < arr.length; i++) {
-        arr[i] = generateScalar(registry, fd, random);
+
+      Object[] values = new Object[fieldDefinition.getArrayLength()];
+
+      for (int arrayIndex = 0; arrayIndex < values.length; arrayIndex++) {
+        values[arrayIndex] = generateScalar(registry, fieldDefinition, random);
       }
-      return arr;
+
+      return values;
     }
 
-    return generateScalar(registry, fd, random);
+    return generateScalar(registry, fieldDefinition, random);
   }
 
-  protected static Object generateScalar(MessageRegistry registry, FieldDefinition fd, Random random) throws IOException {
-    String enumName = fd.getEnumName();
+  protected static Object generateScalar(
+      MessageRegistry registry,
+      FieldDefinition fieldDefinition,
+      Random random
+  ) throws IOException {
+
+    String enumName = fieldDefinition.getEnumName();
+
     if (enumName != null && !enumName.isEmpty()) {
-      EnumDefinition def = registry.getEnumsByName().get(enumName);
-      if (def != null && def.getEntries() != null && !def.getEntries().isEmpty()) {
-        if (def.isBitmask()) {
-          return pickBitmask(def, random);
+      EnumDefinition enumDefinition = registry.getEnumsByName().get(enumName);
+
+      if (
+          enumDefinition != null
+              && enumDefinition.getEntries() != null
+              && !enumDefinition.getEntries().isEmpty()
+      ) {
+        long enumValue;
+
+        if (enumDefinition.isBitmask()) {
+          enumValue = pickBitmask(enumDefinition, random);
+        } else {
+          enumValue = pickEnumValue(enumDefinition, random);
         }
-        return pickEnumValue(def, random);
+
+        return coerceValueToFieldType(fieldDefinition, enumValue);
       }
-      // If enum metadata missing, fall back to numeric in-range.
     }
 
-    String type = normalizeType(fd.getType());
+    String type = normalizeType(fieldDefinition.getType());
 
     return switch (type) {
       case "uint8_t" -> Integer.valueOf(random.nextInt(256));
@@ -129,62 +157,114 @@ public class RandomValueFactory {
       case "uint16_t" -> Integer.valueOf(random.nextInt(65536));
       case "int16_t" -> Integer.valueOf(random.nextInt(65536) - 32768);
 
-      case "uint32_t" -> Long.valueOf(nextLongBounded(random, 0L, 0xFFFF_FFFFL));
+      case "uint32_t" -> Long.valueOf(nextUnsignedIntValue(random));
       case "int32_t" -> Integer.valueOf(random.nextInt());
 
-      case "uint64_t" -> Long.valueOf(nextLongBounded(random, 0L, Long.MAX_VALUE));
+      case "uint64_t" -> Long.valueOf(nextPositiveLongValue(random));
       case "int64_t" -> Long.valueOf(random.nextLong());
 
       case "float" -> Float.valueOf(nextFloatBounded(random, -10_000f, 10_000f));
       case "double" -> Double.valueOf(nextDoubleBounded(random, -10_000d, 10_000d));
 
-      // Some dialects use "char" for scalar, though rare.
       case "char" -> Integer.valueOf(random.nextInt(128));
 
-      default -> throw new IOException("Unsupported MAVLink field type: " + fd.getType() + " (normalized=" + type + ")");
+      default -> throw new IOException(
+          "Unsupported MAVLink field type: "
+              + fieldDefinition.getType()
+              + " (normalized="
+              + type
+              + ")"
+      );
     };
   }
 
-  protected static long pickEnumValue(EnumDefinition def, Random random) {
-    List<EnumEntry> entries = def.getEntries();
+  protected static Object coerceValueToFieldType(
+      FieldDefinition fieldDefinition,
+      long value
+  ) throws IOException {
+
+    String type = normalizeType(fieldDefinition.getType());
+
+    return switch (type) {
+      case "uint8_t" -> Integer.valueOf((int) (value & 0xFFL));
+      case "int8_t" -> Integer.valueOf((byte) value);
+
+      case "uint16_t" -> Integer.valueOf((int) (value & 0xFFFFL));
+      case "int16_t" -> Integer.valueOf((short) value);
+
+      case "uint32_t" -> Long.valueOf(value & 0xFFFF_FFFFL);
+      case "int32_t" -> Integer.valueOf((int) value);
+
+      case "uint64_t" -> Long.valueOf(value);
+      case "int64_t" -> Long.valueOf(value);
+
+      case "char" -> Integer.valueOf((int) (value & 0x7FL));
+
+      default -> throw new IOException(
+          "Unsupported MAVLink enum field type: "
+              + fieldDefinition.getType()
+              + " (normalized="
+              + type
+              + ")"
+      );
+    };
+  }
+
+  protected static long pickEnumValue(
+      EnumDefinition enumDefinition,
+      Random random
+  ) {
+    List<EnumEntry> entries = enumDefinition.getEntries();
     EnumEntry entry = entries.get(random.nextInt(entries.size()));
+
     return entry.getValue();
   }
 
-  protected static long pickBitmask(EnumDefinition def, Random random) {
-    List<EnumEntry> entries = def.getEntries();
+  protected static long pickBitmask(
+      EnumDefinition enumDefinition,
+      Random random
+  ) {
+    List<EnumEntry> entries = enumDefinition.getEntries();
     int count = Math.min(entries.size(), 1 + random.nextInt(3));
     long mask = 0L;
 
-    for (int i = 0; i < count; i++) {
+    for (int index = 0; index < count; index++) {
       EnumEntry entry = entries.get(random.nextInt(entries.size()));
       mask |= entry.getValue();
     }
+
     return mask;
   }
 
-  protected static boolean isCharType(FieldDefinition fd) {
-    String type = normalizeType(fd.getType());
+  protected static boolean isCharType(FieldDefinition fieldDefinition) {
+    String type = normalizeType(fieldDefinition.getType());
+
     return "char".equals(type);
   }
 
-  protected static String randomAsciiString(int maxLen, int messageId, String fieldName, Random random) {
-    // Stable-ish prefix helps debugging.
+  protected static String randomAsciiString(
+      int maxLength,
+      int messageId,
+      String fieldName,
+      Random random
+  ) {
     String prefix = "M" + messageId + "_" + fieldName + "_";
-    byte[] bytes = new byte[Math.max(1, maxLen)];
+    byte[] bytes = new byte[Math.max(1, maxLength)];
     byte[] prefixBytes = prefix.getBytes(StandardCharsets.US_ASCII);
 
-    int pos = 0;
-    for (int i = 0; i < prefixBytes.length && pos < bytes.length; i++) {
-      bytes[pos++] = prefixBytes[i];
-    }
-    while (pos < bytes.length) {
-      int c = 32 + random.nextInt(95); // printable ASCII 32..126
-      bytes[pos++] = (byte) c;
+    int position = 0;
+
+    for (int index = 0; index < prefixBytes.length && position < bytes.length; index++) {
+      bytes[position] = prefixBytes[index];
+      position++;
     }
 
-    // Return String to match your packer expectation for char arrays.
-    // If you prefer byte[], swap this line.
+    while (position < bytes.length) {
+      int character = 32 + random.nextInt(95);
+      bytes[position] = (byte) character;
+      position++;
+    }
+
     return new String(bytes, StandardCharsets.US_ASCII);
   }
 
@@ -192,48 +272,93 @@ public class RandomValueFactory {
     if (type == null) {
       return "";
     }
-    // Your pipeline already normalizes decorated types; keep this defensive.
-    String t = type.trim();
-    if (t.endsWith("_t")) {
-      return t;
+
+    String trimmedType = type.trim();
+
+    if (trimmedType.endsWith("_t")) {
+      return trimmedType;
     }
-    if (t.contains("uint8_t")) return "uint8_t";
-    if (t.contains("int8_t")) return "int8_t";
-    if (t.contains("uint16_t")) return "uint16_t";
-    if (t.contains("int16_t")) return "int16_t";
-    if (t.contains("uint32_t")) return "uint32_t";
-    if (t.contains("int32_t")) return "int32_t";
-    if (t.contains("uint64_t")) return "uint64_t";
-    if (t.contains("int64_t")) return "int64_t";
-    if (t.equals("float")) return "float";
-    if (t.equals("double")) return "double";
-    if (t.equals("char")) return "char";
-    return t;
-  }
 
-  protected static long perFieldSeed(long baseSeed, int messageId, int fieldIndex) {
-    long s = baseSeed;
-    s ^= (long) messageId * 0x9E37_79B9_7F4A_7C15L;
-    s ^= (long) fieldIndex * 0xC2B2_AE3D_27D4_EB4FL;
-    return s;
-  }
-
-  protected static long nextLongBounded(Random random, long minInclusive, long maxInclusive) {
-    if (minInclusive > maxInclusive) {
-      throw new IllegalArgumentException("min > max");
+    if (trimmedType.contains("uint8_t")) {
+      return "uint8_t";
     }
-    long bound = maxInclusive - minInclusive + 1;
-    long r = random.nextLong();
-    long v = Math.floorMod(r, bound);
-    return minInclusive + v;
+
+    if (trimmedType.contains("int8_t")) {
+      return "int8_t";
+    }
+
+    if (trimmedType.contains("uint16_t")) {
+      return "uint16_t";
+    }
+
+    if (trimmedType.contains("int16_t")) {
+      return "int16_t";
+    }
+
+    if (trimmedType.contains("uint32_t")) {
+      return "uint32_t";
+    }
+
+    if (trimmedType.contains("int32_t")) {
+      return "int32_t";
+    }
+
+    if (trimmedType.contains("uint64_t")) {
+      return "uint64_t";
+    }
+
+    if (trimmedType.contains("int64_t")) {
+      return "int64_t";
+    }
+
+    if (trimmedType.equals("float")) {
+      return "float";
+    }
+
+    if (trimmedType.equals("double")) {
+      return "double";
+    }
+
+    if (trimmedType.equals("char")) {
+      return "char";
+    }
+
+    return trimmedType;
   }
 
+  protected static long perFieldSeed(
+      long baseSeed,
+      int messageId,
+      int fieldIndex
+  ) {
+    long seed = baseSeed;
+    seed ^= (long) messageId * 0x9E37_79B9_7F4A_7C15L;
+    seed ^= (long) fieldIndex * 0xC2B2_AE3D_27D4_EB4FL;
 
-  protected static float nextFloatBounded(Random random, float min, float max) {
-    return min + random.nextFloat() * (max - min);
+    return seed;
   }
 
-  protected static double nextDoubleBounded(Random random, double min, double max) {
-    return min + random.nextDouble() * (max - min);
+  protected static long nextUnsignedIntValue(Random random) {
+    return Integer.toUnsignedLong(random.nextInt());
+  }
+
+  protected static long nextPositiveLongValue(Random random) {
+    return random.nextLong() & Long.MAX_VALUE;
+  }
+
+  protected static float nextFloatBounded(
+      Random random,
+      float minimum,
+      float maximum
+  ) {
+    return minimum + random.nextFloat() * (maximum - minimum);
+  }
+
+  protected static double nextDoubleBounded(
+      Random random,
+      double minimum,
+      double maximum
+  ) {
+    return minimum + random.nextDouble() * (maximum - minimum);
   }
 }

@@ -91,7 +91,7 @@ class MavlinkDialectLoadTest {
     );
   }
 
-  private static Path resourcePath(String resourceName) throws URISyntaxException {
+  public static Path resourcePath(String resourceName) throws URISyntaxException {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     URL resource = classLoader.getResource(resourceName);
 

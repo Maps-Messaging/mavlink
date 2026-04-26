@@ -27,6 +27,7 @@ import io.mapsmessaging.mavlink.message.MessageRegistry;
 import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
 
 import java.lang.reflect.Field;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,11 @@ public final class MavlinkTestSupport {
   public static MavlinkCodec codec() throws Exception {
     MavlinkMessageFormatLoader loader = MavlinkMessageFormatLoader.getInstance();
     return loader.getDialectOrThrow("common");
+  }
+
+  public static MavlinkCodec loadPath(Path path) throws Exception {
+    MavlinkMessageFormatLoader loader = MavlinkMessageFormatLoader.getInstance();
+    return loader.loadDialect(path);
   }
 
   public static MessageRegistry registry(MavlinkCodec codec) {
