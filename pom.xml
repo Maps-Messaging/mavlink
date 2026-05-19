@@ -23,7 +23,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.mapsmessaging</groupId>
     <artifactId>mavlink</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <packaging>jar</packaging>
 
     <name>Mavlink parser, message formatter and schema</name>
@@ -229,7 +229,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.3.1</version>
+                <version>3.4.0</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -281,7 +281,7 @@
                     </includes>
                 </configuration>
                 <groupId>org.apache.maven.plugins</groupId>
-                <version>3.5.4</version>
+                <version>3.5.5</version>
             </plugin>
 
             <!-- sBOM  generator -->
@@ -370,6 +370,14 @@
             <version>2.13.2</version>
         </dependency>
 
+        <!-- Source: https://mvnrepository.com/artifact/io.swagger.core.v3/swagger-annotations -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations</artifactId>
+            <version>2.2.50</version>
+            <scope>compile</scope>
+        </dependency>
+
         <!-- Junit5 -->
         <dependency>
             <artifactId>junit-jupiter-engine</artifactId>
@@ -378,6 +386,26 @@
             <version>6.0.1</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.1</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Source: https://mvnrepository.com/artifact/org.mockito/mockito-junit-jupiter -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>5.23.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Source: https://mvnrepository.com/artifact/org.mockito/mockito-core -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.23.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

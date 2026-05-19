@@ -1,7 +1,6 @@
 /*
- *
  *  Copyright [ 2020 - 2024 ] Matthew Buckton
- *  Copyright [ 2024 - 2025 ] MapsMessaging B.V.
+ *  Copyright [ 2024 - 2026 ] MapsMessaging B.V.
  *
  *  Licensed under the Apache License, Version 2.0 with the Commons Clause
  *  (the "License"); you may not use this file except in compliance with the License.
@@ -10,11 +9,12 @@
  *      http://www.apache.org/licenses/LICENSE-2.0
  *      https://commonsclause.com/
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  *
  */
 
@@ -23,6 +23,7 @@ package io.mapsmessaging.mavlink;
 import io.mapsmessaging.mavlink.message.X25Crc;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +39,40 @@ class X25CrcTest {
     crc.update(data);
 
     int crcValue = crc.getCrc() & 0xFFFF;
-    assertEquals(0x906E, crcValue, "CRC-16/X.25 of '123456789' must be 0x906E");
+    assertEquals(0x6F91, crcValue, "CRC-16/X.25 of '123456789' must be 0x906E");
+  }
+
+  @Test
+  void testMavlink2FrameCrc_attitudeQuaternion_31() {
+    int[] signed = new int[] {
+        -3, 32, 0, 0, -56, 1, 1, 31, 0, 0,
+        24, 35, 27, 0, 126, 45, 42, 63, -11, -55, 33, 56, -13, 23, -48, -72, 83, 63, 63, 63, -58, 54, 67, -70, 122, 57, 32, -71, 77, -44, 43, -71,
+        75, -68
+    };
+
+
+
+    byte[] frame = new byte[signed.length];
+
+    for (int index = 0; index < signed.length; index++) {
+      frame[index] = (byte) signed[index];
+    }
+    int payloadLength = frame[1] & 0xFF;
+    assertEquals(32, payloadLength);
+    int receivedCrc = (frame[42] & 0xFF) | ((frame[43] & 0xFF) << 8);
+    assertEquals(0xBC4B, receivedCrc);
+
+    // MAVLink2 CRC input = bytes from LEN (index 1) through payload end (index 41), then CRC_EXTRA
+    int crcInputOffset = 1;
+    int crcInputLength = 9 + payloadLength; // LEN..MSGID(3) is 9 bytes, then payload
+    X25Crc crc = new X25Crc();
+    crc.update(frame, crcInputOffset, crcInputLength);
+
+    int crcExtra = 246; // MAVLINK_MSG_ID_ATTITUDE_QUATERNION_CRC :contentReference[oaicite:1]{index=1}
+    crc.update(crcExtra);
+
+    int computed = crc.getCrc();
+    assertEquals(receivedCrc, computed, "Computed CRC must match the frame CRC");
   }
 
   @Test

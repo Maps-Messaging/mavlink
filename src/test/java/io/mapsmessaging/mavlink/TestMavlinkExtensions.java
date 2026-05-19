@@ -1,9 +1,30 @@
+/*
+ *  Copyright [ 2020 - 2024 ] Matthew Buckton
+ *  Copyright [ 2024 - 2026 ] MapsMessaging B.V.
+ *
+ *  Licensed under the Apache License, Version 2.0 with the Commons Clause
+ *  (the "License"); you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://commonsclause.com/
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ *
+ */
+
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledField;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
+import io.mapsmessaging.mavlink.codec.MavlinkCodec;
+import io.mapsmessaging.mavlink.message.CompiledField;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -16,17 +37,17 @@ class TestMavlinkExtensions {
   @Test
   void extensionFields_omitted_doNotIncreasePayloadSize() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
-    MavlinkCompiledMessage message = MavlinkTestSupport.firstMessageWithExtensions(registry)
+    CompiledMessage message = MavlinkTestSupport.firstMessageWithExtensions(registry)
         .orElseThrow(() -> new IllegalStateException("No message with extensions found in dialect"));
 
     int messageId = message.getMessageId();
-    List<MavlinkCompiledField> compiledFields = message.getCompiledFields();
+    List<CompiledField> compiledFields = message.getCompiledFields();
 
     int baseSize = 0;
-    for (MavlinkCompiledField compiledField : compiledFields) {
-      MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
+    for (CompiledField compiledField : compiledFields) {
+      FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
       if (fieldDefinition.isExtension()) {
         break;
       }
@@ -41,13 +62,13 @@ class TestMavlinkExtensions {
   @Test
   void extensionFields_present_extendPayloadToLastPresentExtension() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
-    MavlinkCompiledMessage message = MavlinkTestSupport.firstMessageWithExtensions(registry)
+    CompiledMessage message = MavlinkTestSupport.firstMessageWithExtensions(registry)
         .orElseThrow(() -> new IllegalStateException("No message with extensions found in dialect"));
 
     int messageId = message.getMessageId();
-    List<MavlinkCompiledField> fields = message.getCompiledFields();
+    List<CompiledField> fields = message.getCompiledFields();
 
     int firstExtensionIndex = -1;
     int lastExtensionIndex = -1;
@@ -63,8 +84,8 @@ class TestMavlinkExtensions {
 
     Assertions.assertTrue(firstExtensionIndex >= 0, "Expected at least one extension field");
 
-    MavlinkCompiledField firstExtensionField = fields.get(firstExtensionIndex);
-    MavlinkFieldDefinition firstExtensionDefinition = MavlinkTestSupport.fieldDefinition(firstExtensionField);
+    CompiledField firstExtensionField = fields.get(firstExtensionIndex);
+    FieldDefinition firstExtensionDefinition = MavlinkTestSupport.fieldDefinition(firstExtensionField);
 
     Map<String, Object> values = new HashMap<>();
     values.put(firstExtensionDefinition.getName(), numericSampleValue(firstExtensionDefinition));
@@ -73,8 +94,8 @@ class TestMavlinkExtensions {
 
     int expectedSize = 0;
     for (int index = 0; index < fields.size(); index++) {
-      MavlinkCompiledField compiledField = fields.get(index);
-      MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
+      CompiledField compiledField = fields.get(index);
+      FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
 
       expectedSize += MavlinkTestSupport.size(compiledField);
 
@@ -87,8 +108,8 @@ class TestMavlinkExtensions {
         "Payload should extend exactly through the last included extension field for message " + messageId);
 
     if (lastExtensionIndex > firstExtensionIndex) {
-      MavlinkCompiledField lastExtensionField = fields.get(lastExtensionIndex);
-      MavlinkFieldDefinition lastExtensionDefinition = MavlinkTestSupport.fieldDefinition(lastExtensionField);
+      CompiledField lastExtensionField = fields.get(lastExtensionIndex);
+      FieldDefinition lastExtensionDefinition = MavlinkTestSupport.fieldDefinition(lastExtensionField);
 
       Map<String, Object> later = new HashMap<>();
       later.put(lastExtensionDefinition.getName(), numericSampleValue(lastExtensionDefinition));
@@ -108,13 +129,13 @@ class TestMavlinkExtensions {
   @Test
   void extensionFields_middleOmitted_zeroFilledIfLaterExtensionPresent() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
-    MavlinkCompiledMessage message = MavlinkTestSupport.firstMessageWithExtensions(registry)
+    CompiledMessage message = MavlinkTestSupport.firstMessageWithExtensions(registry)
         .orElseThrow(() -> new IllegalStateException("No message with extensions found in dialect"));
 
     int messageId = message.getMessageId();
-    List<MavlinkCompiledField> fields = message.getCompiledFields();
+    List<CompiledField> fields = message.getCompiledFields();
 
     List<Integer> extensionIndexes = new java.util.ArrayList<>();
     for (int index = 0; index < fields.size(); index++) {
@@ -130,7 +151,7 @@ class TestMavlinkExtensions {
     int earlierIndex = extensionIndexes.get(0);
     int laterIndex = extensionIndexes.get(extensionIndexes.size() - 1);
 
-    MavlinkFieldDefinition later = MavlinkTestSupport.fieldDefinition(fields.get(laterIndex));
+    FieldDefinition later = MavlinkTestSupport.fieldDefinition(fields.get(laterIndex));
 
     Map<String, Object> values = new HashMap<>();
     values.put(later.getName(), numericSampleValue(later));
@@ -151,7 +172,7 @@ class TestMavlinkExtensions {
     Assertions.assertNotNull(decoded);
   }
 
-  private Number numericSampleValue(MavlinkFieldDefinition fieldDefinition) {
+  private Number numericSampleValue(FieldDefinition fieldDefinition) {
     // We don't know the exact wire type here without importing codec internals,
     // but for most numeric fields a small positive int is safe.
     return 1;

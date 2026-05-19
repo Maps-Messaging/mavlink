@@ -32,7 +32,8 @@ It **does not**:
 Frame parsing, CRC handling, and framing are provided by the framework layer
 built on top of this codec.
 
-This library is designed to sit **under** a framing and transport layer.
+- Manage system IDs, component IDs, or sequence numbers
+- Implement any transport (UART, UDP, TCP, etc.)
 
 Whant to know more?
  

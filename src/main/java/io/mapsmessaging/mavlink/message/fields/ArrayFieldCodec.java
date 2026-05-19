@@ -1,25 +1,27 @@
 /*
+ *  Copyright [ 2020 - 2024 ] Matthew Buckton
+ *  Copyright [ 2024 - 2026 ] MapsMessaging B.V.
  *
- *     Copyright [ 2020 - 2026 ] [Matthew Buckton]
+ *  Licensed under the Apache License, Version 2.0 with the Commons Clause
+ *  (the "License"); you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
  *
- *     Licensed under the Apache License, Version 2.0 (the "License");
- *     you may not use this file except in compliance with the License.
- *     You may obtain a copy of the License at
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://commonsclause.com/
  *
- *         http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
- *     Unless required by applicable law or agreed to in writing, software
- *     distributed under the License is distributed on an "AS IS" BASIS,
- *     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *     See the License for the specific language governing permissions and
- *     limitations under the License.
+ *
  */
 
 package io.mapsmessaging.mavlink.message.fields;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import java.util.List;
 
 public class ArrayFieldCodec extends AbstractMavlinkFieldCodec {
@@ -44,7 +46,7 @@ public class ArrayFieldCodec extends AbstractMavlinkFieldCodec {
   public Object decode(ByteBuffer buffer) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
 
-    if (treatAsString && getWireType() == MavlinkWireType.CHAR) {
+    if (treatAsString && getWireType() == WireType.CHAR) {
       byte[] temp = new byte[arrayLength];
       buffer.get(temp);
       int end = 0;
@@ -61,7 +63,7 @@ public class ArrayFieldCodec extends AbstractMavlinkFieldCodec {
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
 
-    if (treatAsString && getWireType() == MavlinkWireType.CHAR) {
+    if (treatAsString && getWireType() == WireType.CHAR) {
       String text = value == null ? "" : value.toString();
       byte[] bytes = text.getBytes();
       int length = Math.min(bytes.length, arrayLength);

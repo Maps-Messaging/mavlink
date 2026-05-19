@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright [ 2020 - 2024 ] Matthew Buckton
  *  Copyright [ 2024 - 2026 ] MapsMessaging B.V.
  *
@@ -10,39 +9,39 @@
  *      http://www.apache.org/licenses/LICENSE-2.0
  *      https://commonsclause.com/
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  *
  */
 
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.codec.MavlinkPayloadPacker;
-import io.mapsmessaging.mavlink.codec.MavlinkPayloadParser;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.parser.ClasspathMavlinkIncludeResolver;
-import io.mapsmessaging.mavlink.parser.MavlinkDialectDefinition;
-import io.mapsmessaging.mavlink.parser.MavlinkDialectLoader;
-import io.mapsmessaging.mavlink.parser.MavlinkIncludeResolver;
-import io.mapsmessaging.mavlink.parser.MavlinkXmlParser;
+import io.mapsmessaging.mavlink.codec.MavlinkCodec;
+import io.mapsmessaging.mavlink.codec.PayloadPacker;
+import io.mapsmessaging.mavlink.codec.PayloadParser;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.parser.*;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.xml.parsers.ParserConfigurationException;
-import org.xml.sax.SAXException;
 
 /**
  * Loads and caches MAVLink dialect definitions and builds {@link MavlinkCodec} instances for them.
  *
  * <p>The loader provides a built-in {@code "common"} dialect that is loaded eagerly at startup
  * (fail-fast). Additional dialects may be loaded at runtime from an {@link InputStream} with a
- * caller-supplied {@link MavlinkIncludeResolver} for resolving {@code <include>} directives.</p>
+ * caller-supplied {@link IncludeResolver} for resolving {@code <include>} directives.</p>
  *
  * <p>Dialects are cached by name and can be retrieved via {@link #getDialect(String)} or
  * {@link #getDialectOrThrow(String)}.</p>
@@ -121,7 +120,7 @@ public final class MavlinkMessageFormatLoader {
    *
    * <p>This method is not public by design. Public callers should either use built-ins via
    * {@link #getDialectOrThrow(String)}, or load custom dialects via
-   * {@link #loadDialect(String, InputStream, MavlinkIncludeResolver)}.</p>
+   * {@link #loadDialect(String, InputStream, IncludeResolver)}.</p>
    *
    * @param dialectName dialect name used for caching and lookup
    * @param classpathXml classpath resource path for the dialect XML
@@ -130,7 +129,7 @@ public final class MavlinkMessageFormatLoader {
    * @throws ParserConfigurationException if the XML parser cannot be configured
    * @throws SAXException if the dialect XML is invalid
    */
-  protected MavlinkCodec loadDialectFromClasspath(String dialectName, String classpathXml)
+  private MavlinkCodec loadDialectFromClasspath(String dialectName, String classpathXml)
       throws IOException, ParserConfigurationException, SAXException {
 
     String normalizedDialectName = normalizeDialectName(dialectName);
@@ -141,23 +140,33 @@ public final class MavlinkMessageFormatLoader {
         throw new IOException("Unable to load MAVLink dialect resource: " + classpathXml);
       }
 
-      MavlinkXmlParser mavlinkXmlParser = new MavlinkXmlParser();
-      MavlinkDialectLoader mavlinkDialectLoader = new MavlinkDialectLoader(mavlinkXmlParser);
+      XmlParser mavlinkXmlParser = new XmlParser();
+      DialectLoader dialectLoader = new DialectLoader(mavlinkXmlParser);
 
-      MavlinkIncludeResolver includeResolver =
-          new ClasspathMavlinkIncludeResolver(classLoader, "mavlink");
+      IncludeResolver includeResolver = new ClasspathIncludeResolver(classLoader, "mavlink");
 
-      MavlinkDialectDefinition dialectDefinition =
-          mavlinkDialectLoader.load(normalizedDialectName, inputStream, includeResolver);
+      DialectDefinition dialectDefinition =
+          dialectLoader.load(normalizedDialectName, inputStream, includeResolver);
 
       return buildCodec(normalizedDialectName, dialectDefinition);
+    }
+  }
+
+  public MavlinkCodec loadDialect(Path dialectName) throws IOException, ParserConfigurationException, SAXException {
+    Path base = java.nio.file.Files.isRegularFile(dialectName) ? dialectName.getParent() : dialectName;
+    FilePathIncludeResolver resolver = new FilePathIncludeResolver(base);
+    try(InputStream inputStream = java.nio.file.Files.newInputStream(dialectName)){
+      String fileName = dialectName.getFileName().toString();
+      int dot = fileName.lastIndexOf('.');
+      String dialect = (dot > 0) ? fileName.substring(0, dot) : fileName;
+      return loadDialect(dialect, inputStream, resolver);
     }
   }
 
   /**
    * Loads a dialect from an arbitrary stream and caches the resulting codec under the dialect name.
    *
-   * <p>{@code <include>} directives are resolved using the provided {@link MavlinkIncludeResolver}.</p>
+   * <p>{@code <include>} directives are resolved using the provided {@link IncludeResolver}.</p>
    *
    * @param dialectName dialect name used for caching and lookup
    * @param inputStream dialect XML stream (not closed by this method)
@@ -167,7 +176,7 @@ public final class MavlinkMessageFormatLoader {
    * @throws ParserConfigurationException if the XML parser cannot be configured
    * @throws SAXException if the dialect XML is invalid
    */
-  public MavlinkCodec loadDialect(String dialectName, InputStream inputStream, MavlinkIncludeResolver includeResolver)
+  public MavlinkCodec loadDialect(String dialectName, InputStream inputStream, IncludeResolver includeResolver)
       throws IOException, ParserConfigurationException, SAXException {
 
     String normalizedDialectName = normalizeDialectName(dialectName);
@@ -175,23 +184,21 @@ public final class MavlinkMessageFormatLoader {
     Objects.requireNonNull(inputStream, "inputStream");
     Objects.requireNonNull(includeResolver, "includeResolver");
 
-    MavlinkXmlParser mavlinkXmlParser = new MavlinkXmlParser();
-    MavlinkDialectLoader mavlinkDialectLoader = new MavlinkDialectLoader(mavlinkXmlParser);
+    XmlParser mavlinkXmlParser = new XmlParser();
+    DialectLoader dialectLoader = new DialectLoader(mavlinkXmlParser);
 
-    MavlinkDialectDefinition dialectDefinition =
-        mavlinkDialectLoader.load(normalizedDialectName, inputStream, includeResolver);
-
+    DialectDefinition dialectDefinition = dialectLoader.load(normalizedDialectName, inputStream, includeResolver);
     MavlinkCodec codec = buildCodec(normalizedDialectName, dialectDefinition);
     dialects.put(normalizedDialectName, codec);
 
     return codec;
   }
 
-  private MavlinkCodec buildCodec(String dialectName, MavlinkDialectDefinition dialectDefinition) {
-    MavlinkMessageRegistry registry = MavlinkMessageRegistry.fromDialectDefinition(dialectDefinition);
+  private MavlinkCodec buildCodec(String dialectName, DialectDefinition dialectDefinition) {
+    MessageRegistry registry = MessageRegistry.fromDialectDefinition(dialectDefinition);
 
-    MavlinkPayloadPacker payloadPacker = new MavlinkPayloadPacker(registry);
-    MavlinkPayloadParser payloadParser = new MavlinkPayloadParser(registry);
+    PayloadPacker payloadPacker = new PayloadPacker(registry);
+    PayloadParser payloadParser = new PayloadParser(registry);
 
     return new MavlinkCodec(dialectName, registry, payloadPacker, payloadParser);
   }

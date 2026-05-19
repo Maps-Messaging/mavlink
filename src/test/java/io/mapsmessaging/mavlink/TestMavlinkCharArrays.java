@@ -1,10 +1,31 @@
+/*
+ *  Copyright [ 2020 - 2024 ] Matthew Buckton
+ *  Copyright [ 2024 - 2026 ] MapsMessaging B.V.
+ *
+ *  Licensed under the Apache License, Version 2.0 with the Commons Clause
+ *  (the "License"); you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://commonsclause.com/
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ *
+ */
+
 package io.mapsmessaging.mavlink;
 
-import io.mapsmessaging.mavlink.message.MavlinkCompiledField;
-import io.mapsmessaging.mavlink.message.MavlinkCompiledMessage;
-import io.mapsmessaging.mavlink.message.MavlinkMessageRegistry;
-import io.mapsmessaging.mavlink.message.fields.MavlinkFieldDefinition;
-import io.mapsmessaging.mavlink.message.fields.MavlinkWireType;
+import io.mapsmessaging.mavlink.codec.MavlinkCodec;
+import io.mapsmessaging.mavlink.message.CompiledField;
+import io.mapsmessaging.mavlink.message.CompiledMessage;
+import io.mapsmessaging.mavlink.message.MessageRegistry;
+import io.mapsmessaging.mavlink.message.fields.FieldDefinition;
+import io.mapsmessaging.mavlink.message.fields.WireType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -20,18 +41,18 @@ class TestMavlinkCharArrays {
   @Test
   void charArray_stringIsTruncatedAndNullPadded() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
-    MavlinkCompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
+    CompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
         .orElseThrow(() -> new IllegalStateException("No message with array fields found"));
 
-    MavlinkCompiledField charArrayField = findFirstCharArrayField(message);
+    CompiledField charArrayField = findFirstCharArrayField(message);
     if (charArrayField == null) {
       return; // no char arrays in this dialect revision, skip
     }
 
     int messageId = message.getMessageId();
-    MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(charArrayField);
+    FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(charArrayField);
 
     String longText = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     Map<String, Object> values = new HashMap<>();
@@ -66,18 +87,18 @@ class TestMavlinkCharArrays {
   @Test
   void charArray_byteArrayAccepted() throws Exception {
     MavlinkCodec codec = MavlinkTestSupport.codec();
-    MavlinkMessageRegistry registry = codec.getRegistry();
+    MessageRegistry registry = codec.getRegistry();
 
-    MavlinkCompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
+    CompiledMessage message = MavlinkTestSupport.firstMessageWithArray(registry)
         .orElseThrow(() -> new IllegalStateException("No message with array fields found"));
 
-    MavlinkCompiledField charArrayField = findFirstCharArrayField(message);
+    CompiledField charArrayField = findFirstCharArrayField(message);
     if (charArrayField == null) {
       return;
     }
 
     int messageId = message.getMessageId();
-    MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(charArrayField);
+    FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(charArrayField);
 
     byte[] input = "HELLO".getBytes(StandardCharsets.UTF_8);
 
@@ -92,11 +113,11 @@ class TestMavlinkCharArrays {
     Assertions.assertNotNull(decoded.get(fieldDefinition.getName()));
   }
 
-  private MavlinkCompiledField findFirstCharArrayField(MavlinkCompiledMessage message) {
-    List<MavlinkCompiledField> fields = message.getCompiledFields();
-    for (MavlinkCompiledField compiledField : fields) {
-      MavlinkFieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
-      if (fieldDefinition.isArray() && fieldDefinition.getWireType() == MavlinkWireType.CHAR) {
+  private CompiledField findFirstCharArrayField(CompiledMessage message) {
+    List<CompiledField> fields = message.getCompiledFields();
+    for (CompiledField compiledField : fields) {
+      FieldDefinition fieldDefinition = MavlinkTestSupport.fieldDefinition(compiledField);
+      if (fieldDefinition.isArray() && fieldDefinition.getWireType() == WireType.CHAR) {
         return compiledField;
       }
     }
