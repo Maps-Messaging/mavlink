@@ -389,7 +389,7 @@
         <dependency>
             <groupId>com.networknt</groupId>
             <artifactId>json-schema-validator</artifactId>
-            <version>1.5.1</version>
+            <version>3.0.2</version>
             <scope>test</scope>
         </dependency>
         <!-- Source: https://mvnrepository.com/artifact/org.mockito/mockito-junit-jupiter -->
