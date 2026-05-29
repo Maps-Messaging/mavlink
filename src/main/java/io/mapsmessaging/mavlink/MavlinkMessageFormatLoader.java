@@ -24,13 +24,19 @@ import io.mapsmessaging.mavlink.codec.MavlinkCodec;
 import io.mapsmessaging.mavlink.codec.PayloadPacker;
 import io.mapsmessaging.mavlink.codec.PayloadParser;
 import io.mapsmessaging.mavlink.message.MessageRegistry;
-import io.mapsmessaging.mavlink.parser.*;
+import io.mapsmessaging.mavlink.parser.ClasspathIncludeResolver;
+import io.mapsmessaging.mavlink.parser.DialectDefinition;
+import io.mapsmessaging.mavlink.parser.DialectLoader;
+import io.mapsmessaging.mavlink.parser.FilePathIncludeResolver;
+import io.mapsmessaging.mavlink.parser.IncludeResolver;
+import io.mapsmessaging.mavlink.parser.XmlParser;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -40,16 +46,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * Loads and caches MAVLink dialect definitions and builds {@link MavlinkCodec} instances for them.
  *
  * <p>The loader provides a built-in {@code "common"} dialect that is loaded eagerly at startup
- * (fail-fast). Additional dialects may be loaded at runtime from an {@link InputStream} with a
- * caller-supplied {@link IncludeResolver} for resolving {@code <include>} directives.</p>
+ * (fail-fast). Additional bundled dialects may be loaded lazily from the classpath, using names such
+ * as {@code "ardupilot/ardupilotmega"}.</p>
  *
- * <p>Dialects are cached by name and can be retrieved via {@link #getDialect(String)} or
- * {@link #getDialectOrThrow(String)}.</p>
+ * <p>Custom dialects may also be loaded at runtime from an {@link InputStream} with a caller-supplied
+ * {@link IncludeResolver} for resolving {@code <include>} directives.</p>
  */
 public final class MavlinkMessageFormatLoader {
 
   private static final String DEFAULT_DIALECT_NAME = "common";
-  private static final String DEFAULT_DIALECT_RESOURCE = "mavlink/common.xml";
+  private static final String MAVLINK_RESOURCE_ROOT = "mavlink";
+  private static final String XML_EXTENSION = ".xml";
 
   private static final MavlinkMessageFormatLoader INSTANCE = new MavlinkMessageFormatLoader();
 
@@ -67,16 +74,13 @@ public final class MavlinkMessageFormatLoader {
   private MavlinkMessageFormatLoader() {
     dialects = new ConcurrentHashMap<>();
 
-    // Fail fast: "common" is required by design.
     try {
-      MavlinkCodec commonCodec = loadDialectFromClasspath(DEFAULT_DIALECT_NAME, DEFAULT_DIALECT_RESOURCE);
+      MavlinkCodec commonCodec = loadBundledDialect(DEFAULT_DIALECT_NAME);
       dialects.put(DEFAULT_DIALECT_NAME, commonCodec);
     } catch (Exception exception) {
       throw new IllegalStateException(
-          "Failed to load built-in MAVLink dialect '" + DEFAULT_DIALECT_NAME + "' from resource '" +
-              DEFAULT_DIALECT_RESOURCE + "'. Library cannot operate.",
-          exception
-      );
+          "Failed to load built-in MAVLink dialect '" + DEFAULT_DIALECT_NAME + "'. Library cannot operate.",
+          exception);
     }
   }
 
@@ -85,7 +89,7 @@ public final class MavlinkMessageFormatLoader {
    *
    * <p>If {@code dialectName} is {@code null} or blank, {@code "common"} is assumed.</p>
    *
-   * @param dialectName dialect name (e.g. {@code "common"})
+   * @param dialectName dialect name, for example {@code "common"} or {@code "ardupilot/ardupilotmega"}
    * @return codec if loaded/cached
    */
   public Optional<MavlinkCodec> getDialect(String dialectName) {
@@ -94,72 +98,56 @@ public final class MavlinkMessageFormatLoader {
   }
 
   /**
-   * Returns a cached dialect codec, or throws if the dialect has not been loaded.
+   * Returns a cached dialect codec, or lazily loads a bundled classpath dialect if available.
    *
    * <p>If {@code dialectName} is {@code null} or blank, {@code "common"} is assumed.</p>
    *
-   * @param dialectName dialect name (e.g. {@code "common"})
-   * @return cached codec
-   * @throws IOException if the dialect is not known/loaded
+   * @param dialectName dialect name, for example {@code "common"} or {@code "ardupilot/ardupilotmega"}
+   * @return cached or newly loaded codec
+   * @throws IOException if the dialect is not known or cannot be loaded
    */
   public MavlinkCodec getDialectOrThrow(String dialectName) throws IOException {
     String normalizedDialectName = normalizeDialectName(dialectName);
     MavlinkCodec codec = dialects.get(normalizedDialectName);
 
-    if (codec == null) {
-      throw new IOException("Unknown MAVLink dialect: " + normalizedDialectName);
+    if (codec != null) {
+      return codec;
     }
 
-    return codec;
+    try {
+      MavlinkCodec loadedCodec = loadBundledDialect(normalizedDialectName);
+      MavlinkCodec existingCodec = dialects.putIfAbsent(normalizedDialectName, loadedCodec);
+
+      if (existingCodec != null) {
+        return existingCodec;
+      }
+
+      return loadedCodec;
+    } catch (ParserConfigurationException | SAXException exception) {
+      throw new IOException("Failed to load MAVLink dialect: " + normalizedDialectName, exception);
+    }
   }
 
   /**
-   * Loads a dialect by name from the classpath.
+   * Loads a dialect from a file path and caches the resulting codec.
    *
-   * <p>{@code <include>} directives are resolved from the {@code mavlink/} classpath folder.</p>
-   *
-   * <p>This method is not public by design. Public callers should either use built-ins via
-   * {@link #getDialectOrThrow(String)}, or load custom dialects via
-   * {@link #loadDialect(String, InputStream, IncludeResolver)}.</p>
-   *
-   * @param dialectName dialect name used for caching and lookup
-   * @param classpathXml classpath resource path for the dialect XML
+   * @param dialectPath XML dialect file path
    * @return built codec for the dialect
-   * @throws IOException if the classpath resource cannot be opened
+   * @throws IOException if the file cannot be read
    * @throws ParserConfigurationException if the XML parser cannot be configured
    * @throws SAXException if the dialect XML is invalid
    */
-  private MavlinkCodec loadDialectFromClasspath(String dialectName, String classpathXml)
+  public MavlinkCodec loadDialect(Path dialectPath)
       throws IOException, ParserConfigurationException, SAXException {
 
-    String normalizedDialectName = normalizeDialectName(dialectName);
+    Path basePath = java.nio.file.Files.isRegularFile(dialectPath) ? dialectPath.getParent() : dialectPath;
+    FilePathIncludeResolver resolver = new FilePathIncludeResolver(basePath);
 
-    ClassLoader classLoader = getClass().getClassLoader();
-    try (InputStream inputStream = classLoader.getResourceAsStream(classpathXml)) {
-      if (inputStream == null) {
-        throw new IOException("Unable to load MAVLink dialect resource: " + classpathXml);
-      }
+    try (InputStream inputStream = java.nio.file.Files.newInputStream(dialectPath)) {
+      String fileName = dialectPath.getFileName().toString();
+      String dialectName = stripXmlExtension(fileName);
 
-      XmlParser mavlinkXmlParser = new XmlParser();
-      DialectLoader dialectLoader = new DialectLoader(mavlinkXmlParser);
-
-      IncludeResolver includeResolver = new ClasspathIncludeResolver(classLoader, "mavlink");
-
-      DialectDefinition dialectDefinition =
-          dialectLoader.load(normalizedDialectName, inputStream, includeResolver);
-
-      return buildCodec(normalizedDialectName, dialectDefinition);
-    }
-  }
-
-  public MavlinkCodec loadDialect(Path dialectName) throws IOException, ParserConfigurationException, SAXException {
-    Path base = java.nio.file.Files.isRegularFile(dialectName) ? dialectName.getParent() : dialectName;
-    FilePathIncludeResolver resolver = new FilePathIncludeResolver(base);
-    try(InputStream inputStream = java.nio.file.Files.newInputStream(dialectName)){
-      String fileName = dialectName.getFileName().toString();
-      int dot = fileName.lastIndexOf('.');
-      String dialect = (dot > 0) ? fileName.substring(0, dot) : fileName;
-      return loadDialect(dialect, inputStream, resolver);
+      return loadDialect(dialectName, inputStream, resolver);
     }
   }
 
@@ -169,7 +157,7 @@ public final class MavlinkMessageFormatLoader {
    * <p>{@code <include>} directives are resolved using the provided {@link IncludeResolver}.</p>
    *
    * @param dialectName dialect name used for caching and lookup
-   * @param inputStream dialect XML stream (not closed by this method)
+   * @param inputStream dialect XML stream, not closed by this method
    * @param includeResolver include resolver for {@code <include>} directives
    * @return built codec for the dialect
    * @throws IOException if the dialect cannot be read or resolved
@@ -194,6 +182,31 @@ public final class MavlinkMessageFormatLoader {
     return codec;
   }
 
+  private MavlinkCodec loadBundledDialect(String dialectName)
+      throws IOException, ParserConfigurationException, SAXException {
+
+    String normalizedDialectName = normalizeDialectName(dialectName);
+    String classpathXml = toBundledDialectResource(normalizedDialectName);
+    String includeBasePath = getIncludeBasePath(classpathXml);
+
+    ClassLoader classLoader = getClass().getClassLoader();
+
+    try (InputStream inputStream = classLoader.getResourceAsStream(classpathXml)) {
+      if (inputStream == null) {
+        throw new IOException("Unable to load MAVLink dialect resource: " + classpathXml);
+      }
+
+      XmlParser mavlinkXmlParser = new XmlParser();
+      DialectLoader dialectLoader = new DialectLoader(mavlinkXmlParser);
+      IncludeResolver includeResolver = new ClasspathIncludeResolver(classLoader, includeBasePath);
+
+      DialectDefinition dialectDefinition =
+          dialectLoader.load(normalizedDialectName, inputStream, includeResolver);
+
+      return buildCodec(normalizedDialectName, dialectDefinition);
+    }
+  }
+
   private MavlinkCodec buildCodec(String dialectName, DialectDefinition dialectDefinition) {
     MessageRegistry registry = MessageRegistry.fromDialectDefinition(dialectDefinition);
 
@@ -205,9 +218,46 @@ public final class MavlinkMessageFormatLoader {
 
   private String normalizeDialectName(String dialectName) {
     String trimmedDialectName = dialectName == null ? "" : dialectName.trim();
+
     if (trimmedDialectName.isEmpty()) {
       return DEFAULT_DIALECT_NAME;
     }
-    return trimmedDialectName;
+
+    String normalizedDialectName = trimmedDialectName.replace('\\', '/');
+
+    while (normalizedDialectName.startsWith("/")) {
+      normalizedDialectName = normalizedDialectName.substring(1);
+    }
+
+    if (normalizedDialectName.startsWith(MAVLINK_RESOURCE_ROOT + "/")) {
+      normalizedDialectName = normalizedDialectName.substring(MAVLINK_RESOURCE_ROOT.length() + 1);
+    }
+
+    normalizedDialectName = stripXmlExtension(normalizedDialectName);
+
+    return normalizedDialectName.toLowerCase(Locale.ROOT);
+  }
+
+  private String toBundledDialectResource(String dialectName) {
+    String normalizedDialectName = normalizeDialectName(dialectName);
+    return MAVLINK_RESOURCE_ROOT + "/" + normalizedDialectName + XML_EXTENSION;
+  }
+
+  private String getIncludeBasePath(String classpathXml) {
+    int slashIndex = classpathXml.lastIndexOf('/');
+
+    if (slashIndex < 0) {
+      return "";
+    }
+
+    return classpathXml.substring(0, slashIndex);
+  }
+
+  private String stripXmlExtension(String value) {
+    if (value.toLowerCase(Locale.ROOT).endsWith(XML_EXTENSION)) {
+      return value.substring(0, value.length() - XML_EXTENSION.length());
+    }
+
+    return value;
   }
 }
