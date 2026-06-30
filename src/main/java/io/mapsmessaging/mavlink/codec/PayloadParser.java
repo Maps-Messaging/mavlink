@@ -66,8 +66,17 @@ public class PayloadParser {
 
       if (!fieldDefinition.isExtension()) {
         if (truncated || buffer.remaining() < fieldSize) {
+          if(compiledField.getFieldDefinition().getType().equals("char") && buffer.remaining() > 0) {
+            truncated = true;
+            int availableLength = buffer.remaining();
+            byte[] textBytes = new byte[availableLength];
+            buffer.get(textBytes);
+            result.put(fieldName, new String(textBytes, StandardCharsets.UTF_8));
+            continue;
+          }
+
           truncated = true;
-          result.put(fieldName, zeroValue(fieldDefinition));
+          result.put(fieldName, this.zeroValue(fieldDefinition));
           continue;
         }
       } else {

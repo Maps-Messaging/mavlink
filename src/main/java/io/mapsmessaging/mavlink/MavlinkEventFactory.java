@@ -31,6 +31,7 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -38,33 +39,24 @@ import java.util.Optional;
 
 public class MavlinkEventFactory {
 
+  private static final String DEFAULT_DIALECT_NAME = "common";
+
   private MavlinkFrameCodec frameCodec;
   private SystemContextManager systemContextManager;
 
   public MavlinkEventFactory() throws IOException {
-    this("common");
+    this(DEFAULT_DIALECT_NAME);
   }
 
   public MavlinkEventFactory(String dialectName) throws IOException {
-    Optional<MavlinkCodec> codec = MavlinkMessageFormatLoader.getInstance().getDialect(dialectName);
-    if (codec.isPresent()) {
-      MavlinkCodec codecInstance = codec.get();
-      frameCodec = new MavlinkFrameCodec(codecInstance);
-      systemContextManager = new SystemContextManager();
-    }
-    else{
-      throw new IOException("Mavlink "+dialectName+" codec not found");
-    }
+    initialise(loadCodec(dialectName));
   }
-
 
   public MavlinkEventFactory(Path dialectPath) throws IOException, ParserConfigurationException, SAXException {
-    MavlinkCodec codec = MavlinkMessageFormatLoader.getInstance().loadDialect(dialectPath);
-    frameCodec = new MavlinkFrameCodec(codec);
-    systemContextManager = new SystemContextManager();
+    initialise(MavlinkMessageFormatLoader.getInstance().loadDialect(dialectPath));
   }
 
-  public MavlinkEventFactory(MavlinkFrameCodec frameCodec, SystemContextManager systemContextManager){
+  public MavlinkEventFactory(MavlinkFrameCodec frameCodec, SystemContextManager systemContextManager) {
     this.frameCodec = frameCodec;
     this.systemContextManager = systemContextManager;
   }
@@ -76,27 +68,57 @@ public class MavlinkEventFactory {
     if (frameOptional.isEmpty()) {
       return Optional.empty();
     }
+
     Frame frame = frameOptional.get();
     FrameFailureReason failureReason = frame.getValidated();
     Map<String, Object> fields = frameCodec.parsePayload(frame);
+
     String name = "";
     CompiledMessage message = frameCodec.getRegistry().getCompiledMessagesById().get(frame.getMessageId());
-    if(message != null){
+    if (message != null) {
       name = message.getName();
     }
+
     if (failureReason == FrameFailureReason.OK || failureReason == FrameFailureReason.UNSIGNED) {
       List<Detection> detectionList = systemContextManager.onValidatedFrame(frame, streamName, timestamp);
       return Optional.of(new ProcessedFrame(name, frame, fields, true, detectionList));
     }
+
     List<Detection> detectionList = systemContextManager.onInvalidFrame(
         frame.getSystemId(),
         streamName,
         timestamp,
         failureReason
     );
+
     return Optional.of(new ProcessedFrame(name, frame, Map.of(), false, detectionList));
   }
 
+  private MavlinkCodec loadCodec(String dialectName) throws IOException {
+    String resolvedDialectName = resolveDialectName(dialectName);
+    Path dialectPath = Path.of(resolvedDialectName);
 
+    if (Files.isRegularFile(dialectPath)) {
+      try {
+        return MavlinkMessageFormatLoader.getInstance().loadDialect(dialectPath);
+      } catch (ParserConfigurationException | SAXException exception) {
+        throw new IOException("Failed to load MAVLink dialect from path: " + dialectPath, exception);
+      }
+    }
 
+    return MavlinkMessageFormatLoader.getInstance().getDialectOrThrow(resolvedDialectName);
+  }
+
+  private void initialise(MavlinkCodec codec) {
+    frameCodec = new MavlinkFrameCodec(codec);
+    systemContextManager = new SystemContextManager();
+  }
+
+  private String resolveDialectName(String dialectName) {
+    if (dialectName == null || dialectName.trim().isEmpty()) {
+      return DEFAULT_DIALECT_NAME;
+    }
+
+    return dialectName.trim();
+  }
 }
