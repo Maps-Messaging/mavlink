@@ -54,8 +54,7 @@ public class PayloadPacker {
     int payloadSize = computeTotalPotentialPayloadSize(compiledFields);
 
     if (payloadSize <= 0) {
-      throw new IOException("Computed MAVLink payload size is 0 for message id: " + messageId +
-          " (" + compiledMessage.getName() + "). Likely extension/base field classification bug.");
+      throw new IOException("Computed MAVLink payload size is 0 for message id: " + messageId + " (" + compiledMessage.getName() + "). Likely extension/base field classification bug.");
     }
 
     ByteBuffer buffer = allocate(payloadSize);
@@ -162,9 +161,7 @@ public class PayloadPacker {
     try {
       compiledField.getFieldCodec().encode(buffer, value);
     } catch (Exception e) {
-      e.printStackTrace();
-      throw new IOException("Failed to encode field '" + compiledField.getFieldDefinition().getName() +
-          "' with value type " + value.getClass().getName(), e);
+      throw new IOException("Failed to encode field '" + compiledField.getFieldDefinition().getName() + "' with value type " + value.getClass().getName(), e);
     }
   }
 
@@ -190,8 +187,7 @@ public class PayloadPacker {
     } else if (value instanceof byte[] b) {
       src = b;
     } else {
-      throw new IOException("CHAR array field '" + field.getName() + "' expects String or byte[], got: " +
-          value.getClass().getName());
+      throw new IOException("CHAR array field '" + field.getName() + "' expects String or byte[], got: " + value.getClass().getName());
     }
 
     int copyLen = Math.min(len, src.length);
@@ -233,8 +229,7 @@ public class PayloadPacker {
       }
       return tmp;
     }
-    throw new IOException("Array field '" + fieldName + "' expects List or array, got: " +
-        (value == null ? "null" : value.getClass().getName()));
+    throw new IOException("Array field '" + fieldName + "' expects List or array, got: " + (value == null ? "null" : value.getClass().getName()));
   }
 
   private void zeroFill(CompiledField compiledField, ByteBuffer buffer) {

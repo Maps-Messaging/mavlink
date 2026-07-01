@@ -20,10 +20,13 @@
 
 package io.mapsmessaging.mavlink.message.fields;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 public class UInt32FieldCodec extends AbstractMavlinkFieldCodec {
+
+  private static final BigInteger MAX_UINT32 = BigInteger.valueOf(4_294_967_295L);
 
   public UInt32FieldCodec() {
     super(WireType.UINT32);
@@ -38,6 +41,42 @@ public class UInt32FieldCodec extends AbstractMavlinkFieldCodec {
   @Override
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
-    buffer.putInt(((Number) value).intValue());
+    buffer.putInt(toUnsignedInt(value));
+  }
+
+  private int toUnsignedInt(Object value) {
+    if (value instanceof Integer integerValue) {
+      return integerValue;
+    }
+
+    if (value instanceof Short shortValue) {
+      return Short.toUnsignedInt(shortValue);
+    }
+
+    if (value instanceof Byte byteValue) {
+      return Byte.toUnsignedInt(byteValue);
+    }
+
+    BigInteger bigIntegerValue;
+
+    if (value instanceof BigInteger bigInteger) {
+      bigIntegerValue = bigInteger;
+    } else if (value instanceof Number number) {
+      bigIntegerValue = BigInteger.valueOf(number.longValue());
+    } else if (value instanceof String stringValue) {
+      try {
+        bigIntegerValue = new BigInteger(stringValue);
+      } catch (NumberFormatException exception) {
+        throw new IllegalArgumentException("Unable to encode UINT32 field from value: " + stringValue, exception);
+      }
+    } else {
+      throw new IllegalArgumentException("Unable to encode UINT32 field from value type " + value.getClass().getName());
+    }
+
+    if (bigIntegerValue.signum() < 0 || bigIntegerValue.compareTo(MAX_UINT32) > 0) {
+      throw new IllegalArgumentException("UINT32 value out of range: " + bigIntegerValue);
+    }
+
+    return bigIntegerValue.intValue();
   }
 }

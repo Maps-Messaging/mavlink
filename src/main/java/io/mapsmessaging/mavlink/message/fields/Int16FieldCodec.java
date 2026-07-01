@@ -38,6 +38,22 @@ public class Int16FieldCodec extends AbstractMavlinkFieldCodec {
   @Override
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
-    buffer.putShort(((Number) value).shortValue());
+    buffer.putShort(toShort(value));
+  }
+
+  private short toShort(Object value) {
+    if (value instanceof Number number) {
+      return number.shortValue();
+    }
+
+    if (value instanceof String stringValue) {
+      try {
+        return Short.parseShort(stringValue);
+      } catch (NumberFormatException exception) {
+        throw new IllegalArgumentException("Unable to encode INT16 field from value: " + stringValue, exception);
+      }
+    }
+
+    throw new IllegalArgumentException("Unable to encode INT16 field from value type " + value.getClass().getName());
   }
 }
