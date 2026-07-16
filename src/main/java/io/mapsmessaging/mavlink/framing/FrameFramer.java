@@ -48,67 +48,63 @@ public final class FrameFramer {
   }
 
   public Optional<Frame> tryDecode(ByteBuffer networkOwnedBuffer) {
-    try {
-      if (!networkOwnedBuffer.hasRemaining()) {
+    if (!networkOwnedBuffer.hasRemaining()) {
+      return Optional.empty();
+    }
+
+    int scanIndex = networkOwnedBuffer.position();
+    int bufferLimit = networkOwnedBuffer.limit();
+
+    while (scanIndex < bufferLimit) {
+      int startByte = networkOwnedBuffer.get(scanIndex) & 0xFF;
+
+      FrameHandler handler;
+      if (startByte == MAVLINK_V1_STX) {
+        handler = mavlinkV1FrameHandler;
+      } else if (startByte == MAVLINK_V2_STX) {
+        handler = mavlinkV2FrameHandler;
+      } else {
+        scanIndex++;
+        continue;
+      }
+
+      int minimumHeaderBytes = handler.minimumBytesRequiredForHeader();
+      if (scanIndex + minimumHeaderBytes > bufferLimit) {
+        networkOwnedBuffer.position(scanIndex);
         return Optional.empty();
       }
 
-      int scanIndex = networkOwnedBuffer.position();
-      int bufferLimit = networkOwnedBuffer.limit();
-
-      while (scanIndex < bufferLimit) {
-        int startByte = networkOwnedBuffer.get(scanIndex) & 0xFF;
-
-        FrameHandler handler = null;
-        if (startByte == MAVLINK_V1_STX) {
-          handler = mavlinkV1FrameHandler;
-        } else if (startByte == MAVLINK_V2_STX) {
-          handler = mavlinkV2FrameHandler;
-        } else {
-          scanIndex++;
-          continue;
-        }
-
-        int minimumHeaderBytes = handler.minimumBytesRequiredForHeader();
-        if (scanIndex + minimumHeaderBytes > bufferLimit) {
-          networkOwnedBuffer.position(scanIndex);
-          return Optional.empty();
-        }
-
-        int payloadLength = handler.peekPayloadLength(networkOwnedBuffer, scanIndex);
-        if (payloadLength < 0 || payloadLength > MAVLINK_MAX_PAYLOAD_LENGTH) {
-          scanIndex++;
-          continue;
-        }
-
-        int totalFrameLength = handler.computeTotalFrameLength(networkOwnedBuffer, scanIndex, payloadLength);
-        if (totalFrameLength <= 0) {
-          scanIndex++;
-          continue;
-        }
-
-        if (scanIndex + totalFrameLength > bufferLimit) {
-          networkOwnedBuffer.position(scanIndex);
-          return Optional.empty();
-        }
-
-        ByteBuffer candidateFrame = networkOwnedBuffer.duplicate();
-        candidateFrame.position(scanIndex);
-        candidateFrame.limit(scanIndex + totalFrameLength);
-
-        Optional<Frame> decodedFrame = handler.tryDecode(candidateFrame);
-        if (decodedFrame.isPresent()) {
-          networkOwnedBuffer.position(scanIndex + totalFrameLength);
-          return decodedFrame;
-        }
-
+      int payloadLength = handler.peekPayloadLength(networkOwnedBuffer, scanIndex);
+      if (payloadLength < 0 || payloadLength > MAVLINK_MAX_PAYLOAD_LENGTH) {
         scanIndex++;
+        continue;
       }
 
-      networkOwnedBuffer.position(bufferLimit);
-      return Optional.empty();
-    } finally {
-      networkOwnedBuffer.compact();
+      int totalFrameLength = handler.computeTotalFrameLength(networkOwnedBuffer, scanIndex, payloadLength);
+      if (totalFrameLength <= 0) {
+        scanIndex++;
+        continue;
+      }
+
+      if (scanIndex + totalFrameLength > bufferLimit) {
+        networkOwnedBuffer.position(scanIndex);
+        return Optional.empty();
+      }
+
+      ByteBuffer candidateFrame = networkOwnedBuffer.duplicate();
+      candidateFrame.position(scanIndex);
+      candidateFrame.limit(scanIndex + totalFrameLength);
+
+      Optional<Frame> decodedFrame = handler.tryDecode(candidateFrame);
+      if (decodedFrame.isPresent()) {
+        networkOwnedBuffer.position(scanIndex + totalFrameLength);
+        return decodedFrame;
+      }
+
+      scanIndex++;
     }
+
+    networkOwnedBuffer.position(bufferLimit);
+    return Optional.empty();
   }
 }
