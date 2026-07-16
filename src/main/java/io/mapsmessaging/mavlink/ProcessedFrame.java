@@ -34,4 +34,5 @@ public class ProcessedFrame {
   Map<String, Object> fields;
   boolean valid;
   List<Detection> detections;
+  byte[] rawPayload;
 }

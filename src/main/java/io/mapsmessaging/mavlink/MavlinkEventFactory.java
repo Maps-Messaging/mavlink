@@ -63,11 +63,20 @@ public class MavlinkEventFactory {
 
   public Optional<ProcessedFrame> unpack(String streamName, ByteBuffer payload) throws IOException {
     long timestamp = System.nanoTime();
+    int startPosition = payload.position();
 
     Optional<Frame> frameOptional = frameCodec.tryUnpackFrame(payload);
     if (frameOptional.isEmpty()) {
       return Optional.empty();
     }
+
+    int endPosition = payload.position();
+    ByteBuffer frameBuffer = payload.duplicate();
+    frameBuffer.position(startPosition);
+    frameBuffer.limit(endPosition);
+
+    byte[] frameBytes = new byte[frameBuffer.remaining()];
+    frameBuffer.get(frameBytes);
 
     Frame frame = frameOptional.get();
     FrameFailureReason failureReason = frame.getValidated();
@@ -81,17 +90,17 @@ public class MavlinkEventFactory {
 
     if (failureReason == FrameFailureReason.OK || failureReason == FrameFailureReason.UNSIGNED) {
       List<Detection> detectionList = systemContextManager.onValidatedFrame(frame, streamName, timestamp);
-      return Optional.of(new ProcessedFrame(name, frame, fields, true, detectionList));
+      return Optional.of(new ProcessedFrame(name, frame, fields, true, detectionList, frameBytes));
     }
 
-    List<Detection> detectionList = systemContextManager.onInvalidFrame(
-        frame.getSystemId(),
-        streamName,
-        timestamp,
-        failureReason
-    );
+    List<Detection> detectionList =
+        systemContextManager.onInvalidFrame(
+            frame.getSystemId(),
+            streamName,
+            timestamp,
+            failureReason);
 
-    return Optional.of(new ProcessedFrame(name, frame, Map.of(), false, detectionList));
+    return Optional.of(new ProcessedFrame(name, frame, Map.of(), false, detectionList, frameBytes));
   }
 
   private MavlinkCodec loadCodec(String dialectName) throws IOException {
