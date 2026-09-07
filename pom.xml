@@ -132,7 +132,7 @@
         <runSuite>**/*Suite.class</runSuite>
         <!-- Below property indicates the pattern of the test suite -->
         <sonar.c.file.suffixes>-</sonar.c.file.suffixes>
-        <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 
         <!-- Sonar-JaCoCo properties -->
         <sonar.cpp.file.suffixes>-</sonar.cpp.file.suffixes>
@@ -332,6 +332,12 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <!-- Sonar -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>5.7.0.6970</version>
             </plugin>
             <plugin>
                 <groupId>org.owasp</groupId>
