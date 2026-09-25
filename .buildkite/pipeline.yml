@@ -2,7 +2,7 @@ steps:
   - label: ":maven: Build and Deploy"
     command:
       - export SONAR_TOKEN=$(buildkite-agent secret get SONAR_TOKEN)
-      - mvn -Dgpg.skip=true clean deploy -Psnapshot
+      - mvn clean deploy -Psnapshot
       - mvn sonar:sonar -Dsonar.token=$${SONAR_TOKEN}
     plugins:
       - test-collector#v1.0.0:
