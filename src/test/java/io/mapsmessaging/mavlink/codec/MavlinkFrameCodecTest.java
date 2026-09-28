@@ -57,6 +57,7 @@ class MavlinkFrameCodecTest {
     output.get(wire);
     ByteBuffer networkBuffer = ByteBuffer.allocate(64);
     networkBuffer.put(wire);
+    networkBuffer.flip();
     MavlinkFrameEnvelope envelope = codec.tryUnpackHeaderAndPayload(networkBuffer).orElseThrow();
     assertEquals(42, envelope.getMessageId());
     assertArrayEquals(new byte[]{7}, envelope.getPayload());
