@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.zip.GZIPInputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,6 +24,28 @@ class TlogArchiveManagerTest {
   private static final DateTimeFormatter ARCHIVE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSS'Z'").withZone(ZoneOffset.UTC);
 
   @TempDir Path temporaryDirectory;
+
+  @Test
+  void interruptedCloseFinishesPendingArchivesAndRestoresInterrupt() throws Exception {
+    Path activeFile = temporaryDirectory.resolve("telemetry.tlog");
+    Path archive = archivePath(Instant.now(), 0, false);
+    Files.write(archive, new byte[]{1, 2, 3});
+    TlogArchiveManager manager = new TlogArchiveManager(configuration(activeFile, true, 0));
+    manager.submit(archive);
+    AtomicBoolean interruptedAfterClose = new AtomicBoolean();
+    Thread closer = new Thread(() -> {
+      Thread.currentThread().interrupt();
+      manager.close();
+      interruptedAfterClose.set(Thread.currentThread().isInterrupted());
+    });
+
+    closer.start();
+    closer.join(5_000);
+
+    assertFalse(closer.isAlive());
+    assertTrue(interruptedAfterClose.get());
+    assertTrue(Files.exists(archive.resolveSibling(archive.getFileName() + ".gz")));
+  }
 
   @Test
   void compressesArchiveAndDeletesSourceOnlyAfterSuccessfulCompression() throws IOException {

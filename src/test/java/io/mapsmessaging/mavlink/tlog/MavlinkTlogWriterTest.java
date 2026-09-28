@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,53 @@ import org.junit.jupiter.api.io.TempDir;
 class MavlinkTlogWriterTest {
 
   @TempDir Path temporaryDirectory;
+
+  @Test
+  void interruptedCloseStillDrainsAcceptedRecordsAndRestoresInterrupt() throws Exception {
+    Path activeFile = temporaryDirectory.resolve("interrupted.tlog");
+    MavlinkTlogWriter writer = new MavlinkTlogWriter(configuration(activeFile).build());
+    assertTrue(writer.write(7L, new byte[]{1, 2}));
+    AtomicBoolean interruptedAfterClose = new AtomicBoolean();
+    Thread closer = new Thread(() -> {
+      Thread.currentThread().interrupt();
+      writer.close();
+      interruptedAfterClose.set(Thread.currentThread().isInterrupted());
+    });
+
+    closer.start();
+    closer.join(5_000);
+
+    assertFalse(closer.isAlive());
+    assertTrue(interruptedAfterClose.get());
+    assertEquals(1, writer.getWrittenRecordCount());
+    assertEquals(Long.BYTES + 2, Files.size(activeFile));
+  }
+
+  @Test
+  void interruptedCloseWhileWriterIsBlockedDoesNotDiscardAcceptedRecord() throws Exception {
+    Path activeFile = temporaryDirectory.resolve("joining.tlog");
+    BlockingTlogOutput output = new BlockingTlogOutput();
+    MavlinkTlogWriter writer = new MavlinkTlogWriter(configuration(activeFile).build(), output);
+    assertTrue(writer.write(8L, new byte[]{3}));
+    assertTrue(output.awaitWriteStarted());
+    AtomicBoolean interruptedAfterClose = new AtomicBoolean();
+    Thread closer = new Thread(() -> {
+      writer.close();
+      interruptedAfterClose.set(Thread.currentThread().isInterrupted());
+    });
+
+    closer.start();
+    try {
+      closer.interrupt();
+    } finally {
+      output.release();
+      closer.join(5_000);
+    }
+
+    assertFalse(closer.isAlive());
+    assertTrue(interruptedAfterClose.get());
+    assertEquals(1, writer.getWrittenRecordCount());
+  }
 
   @Test
   void writesBigEndianTimestampFollowedByUnchangedFrame() throws IOException {

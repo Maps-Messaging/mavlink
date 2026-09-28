@@ -48,7 +48,7 @@ final class RotatingTlogFile implements TlogOutput {
 
   @Override
   public void write(TlogRecord record) throws IOException {
-    long recordSize = Long.BYTES + record.frame().length;
+    long recordSize = (long) Long.BYTES + record.frame().length;
     if (shouldRotate(recordSize)) {
       rotate();
     }

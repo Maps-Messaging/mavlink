@@ -153,7 +153,8 @@ public final class MavlinkTlogWriter implements AutoCloseable {
           break;
         }
       } catch (InterruptedException exception) {
-        interrupted = true;
+        Thread.currentThread().interrupt();
+        interrupted = Thread.interrupted() || interrupted; // Clear only while completing the required drain.
       }
     }
 
@@ -162,7 +163,8 @@ public final class MavlinkTlogWriter implements AutoCloseable {
         writerThread.join();
         break;
       } catch (InterruptedException exception) {
-        interrupted = true;
+        Thread.currentThread().interrupt();
+        interrupted = Thread.interrupted() || interrupted; // Restore the interrupt after the archive is closed.
       }
     }
 
