@@ -205,8 +205,6 @@ public class PayloadPacker {
     try {
       codec.encode(buffer, elements);
     } catch (Exception e) {
-      e.printStackTrace();
-
       throw new IOException("Failed to encode array field '" + field.getName() + "'", e);
     }
 
