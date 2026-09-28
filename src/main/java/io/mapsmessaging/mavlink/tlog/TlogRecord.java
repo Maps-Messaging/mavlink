@@ -15,12 +15,12 @@ record TlogRecord(long timestampMicros, byte[] frame, boolean stop) {
     if (this == other) {
       return true;
     }
-    if (!(other instanceof TlogRecord record)) {
+    if (!(other instanceof TlogRecord otherRecord)) {
       return false;
     }
-    return timestampMicros == record.timestampMicros
-        && stop == record.stop
-        && Arrays.equals(frame, record.frame);
+    return timestampMicros == otherRecord.timestampMicros
+        && stop == otherRecord.stop
+        && Arrays.equals(frame, otherRecord.frame);
   }
 
   @Override
