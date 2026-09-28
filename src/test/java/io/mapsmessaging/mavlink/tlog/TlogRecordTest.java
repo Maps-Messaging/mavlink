@@ -15,6 +15,7 @@ class TlogRecordTest {
     assertEquals(first, first);
     assertNotEquals(first, TlogRecord.data(124L, new byte[]{1, 2}));
     assertNotEquals(first, TlogRecord.data(123L, new byte[]{1, 3}));
+    assertNotEquals(first, new TlogRecord(123L, new byte[]{1, 2}, true));
     assertNotEquals(first, TlogRecord.STOP);
     assertNotEquals(first, "not a record");
     assertTrue(first.toString().contains("frame=[1, 2]"));

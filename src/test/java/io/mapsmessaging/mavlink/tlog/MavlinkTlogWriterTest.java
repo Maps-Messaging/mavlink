@@ -62,6 +62,11 @@ class MavlinkTlogWriterTest {
 
     closer.start();
     try {
+      long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+      while (closer.getState() != Thread.State.WAITING && System.nanoTime() < deadline) {
+        Thread.sleep(1);
+      }
+      assertEquals(Thread.State.WAITING, closer.getState());
       closer.interrupt();
     } finally {
       output.release();
