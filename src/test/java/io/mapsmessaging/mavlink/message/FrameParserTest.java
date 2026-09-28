@@ -44,7 +44,7 @@ class FrameParserTest {
     Frame signed = parser.parse(frameBytes);
     assertTrue(signed.isSigned());
     assertEquals(13, signed.getSignature().length);
-    assertEquals(50, signed.getChecksum());
+    assertEquals(0x3200, signed.getChecksum());
 
     assertThrows(IllegalArgumentException.class, () -> parser.parse(Arrays.copyOf(frameBytes, 24)));
     assertThrows(IllegalArgumentException.class, () -> parser.parse(Arrays.copyOf(frameBytes, 11)));
