@@ -45,7 +45,7 @@ class FramePackerTest {
 
     new FramePacker(dialect, null).pack(output, frame);
 
-    assertEquals(13, output.position());
+    assertEquals(12, output.position());
     assertEquals(0xfe, output.get(2) & 0xff);
     assertEquals(2, output.get(3) & 0xff);
     assertEquals(9, output.get(8) & 0xff);
@@ -61,12 +61,12 @@ class FramePackerTest {
     ByteBuffer output = ByteBuffer.allocate(32);
     new FramePacker(dialect, provider).pack(output, frame);
 
-    assertEquals(28, output.position());
+    assertEquals(27, output.position());
     assertEquals(0xfd, output.get(0) & 0xff);
     assertEquals(1, output.get(2) & 0xff);
     assertEquals(13, frame.getSignature().length);
     output.flip();
-    assertTrue(V2FrameSigning.validateSignature(output, 0, 13, 1, 2, provider));
+    assertTrue(V2FrameSigning.validateSignature(output, 0, 12, 1, 2, provider));
   }
 
   @Test
@@ -83,7 +83,7 @@ class FramePackerTest {
     frame.setPayloadLength(3);
     assertThrows(IllegalArgumentException.class, () -> packer.pack(ByteBuffer.allocate(20), frame));
     frame.setPayloadLength(2);
-    ByteBuffer tooSmall = ByteBuffer.allocate(14);
+    ByteBuffer tooSmall = ByteBuffer.allocate(13);
     assertThrows(IllegalArgumentException.class, () -> packer.pack(tooSmall, frame));
     assertEquals(0, tooSmall.position());
 
@@ -99,6 +99,6 @@ class FramePackerTest {
         return null;
       }
     };
-    assertThrows(IllegalArgumentException.class, () -> new FramePacker(dialect, missingKey).pack(ByteBuffer.allocate(28), frame));
+    assertThrows(IllegalArgumentException.class, () -> new FramePacker(dialect, missingKey).pack(ByteBuffer.allocate(27), frame));
   }
 }
