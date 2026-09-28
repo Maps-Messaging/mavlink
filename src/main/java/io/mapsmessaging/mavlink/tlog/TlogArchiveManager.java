@@ -198,7 +198,8 @@ final class TlogArchiveManager implements AutoCloseable {
           break;
         }
       } catch (InterruptedException exception) {
-        interrupted = true;
+        Thread.currentThread().interrupt();
+        interrupted = Thread.interrupted() || interrupted; // Clear for the next wait, then restore on completion.
       }
     }
     if (interrupted) {
