@@ -21,7 +21,7 @@
 package io.mapsmessaging.mavlink.framing;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.security.MessageDigest;
 
 import static io.mapsmessaging.mavlink.framing.V2FrameHandler.CRC_LENGTH;
 import static io.mapsmessaging.mavlink.framing.V2FrameHandler.SIGNATURE_LENGTH;
@@ -96,7 +96,7 @@ public final class V2FrameSigning {
         signingKey
     );
 
-    return Arrays.equals(expectedSignatureBlock, receivedSignatureBlock);
+    return MessageDigest.isEqual(expectedSignatureBlock, receivedSignatureBlock);
   }
 
   private static long readUnsigned48BitLittleEndian(byte[] source, int offset) {
