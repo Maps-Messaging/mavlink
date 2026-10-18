@@ -30,6 +30,12 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -157,4 +163,67 @@ class MavlinkWireConformanceTest {
     assertEquals(1, ((Number) codec.parsePayload(decoded).get("command")).intValue());
     assertTrue(codec.parsePayload(decoded).containsKey("result"));
   }
+  @Test
+  void mavlink1BasePayloadWithExtensionCapableMessageStillDecodes() throws Exception {
+    MavlinkFrameCodec codec = new MavlinkFrameCodec(MavlinkMessageFormatLoader.getInstance().getDialectOrThrow("common"));
+    Frame commandAck = frame(Version.V1, new byte[]{1, 0, 0}, false);
+    commandAck.setMessageId(77);
+    ByteBuffer wire = ByteBuffer.allocate(64);
+    codec.packFrame(wire, commandAck);
+    wire.flip();
+
+    Frame decoded = codec.tryUnpackFrame(wire).orElseThrow();
+    assertEquals(FrameFailureReason.OK, decoded.getValidated());
+    assertEquals(1, ((Number) codec.parsePayload(decoded).get("command")).intValue());
+  }
+
+  @Test
+  void unknownIncompatibilityBitsAndZeroSenderIdsAreRejected() {
+    Frame signed = frame(Version.V2, new byte[]{9, 8}, false);
+    signed.setIncompatibilityFlags((byte) 0x02);
+    byte[] unknownFlag = pack(new FramePacker(DIALECT, null), signed);
+    V2FrameHandler handler = new V2FrameHandler(DIALECT, new NoSigningKeyProvider());
+    assertTrue(handler.tryDecode(ByteBuffer.wrap(unknownFlag)).isEmpty());
+
+    signed.setIncompatibilityFlags((byte) 0);
+    signed.setCompatibilityFlags((byte) 0x80);
+    byte[] knownSafe = pack(new FramePacker(DIALECT, null), signed);
+    assertEquals(FrameFailureReason.UNSIGNED, handler.tryDecode(ByteBuffer.wrap(knownSafe)).orElseThrow().getValidated());
+
+    signed.setSystemId(0);
+    byte[] invalidSource = pack(new FramePacker(DIALECT, null), signed);
+    assertTrue(handler.tryDecode(ByteBuffer.wrap(invalidSource)).isEmpty());
+  }
+
+  @Test
+  void concurrentCopiesOfOneSignedPacketAreOnlyAuthenticatedOnce() throws Exception {
+    StaticSigningKeyProvider keys = new StaticSigningKeyProvider(new byte[32]);
+    byte[] packet = pack(new FramePacker(DIALECT, keys), frame(Version.V2, new byte[]{9, 8}, true));
+    V2FrameHandler handler = new V2FrameHandler(DIALECT, keys);
+    ExecutorService executor = Executors.newFixedThreadPool(8);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      List<Future<FrameFailureReason>> results = new ArrayList<>();
+      for (int i = 0; i < 16; i++) {
+        results.add(executor.submit(() -> {
+          start.await();
+          return handler.tryDecode(ByteBuffer.wrap(packet)).orElseThrow().getValidated();
+        }));
+      }
+      start.countDown();
+      int authenticated = 0;
+      for (Future<FrameFailureReason> result : results) {
+        if (result.get() == FrameFailureReason.OK) {
+          authenticated++;
+        } else {
+          assertEquals(FrameFailureReason.SIGNATURE_FAILED, result.get());
+        }
+      }
+      assertEquals(1, authenticated);
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
 }
