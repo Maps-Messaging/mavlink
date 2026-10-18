@@ -177,6 +177,33 @@ class MavlinkWireConformanceTest {
     assertEquals(1, ((Number) codec.parsePayload(decoded).get("command")).intValue());
   }
 
+  private static byte[] withRecomputedChecksum(byte[] wire, int crcExtra) {
+    ByteBuffer buffer = ByteBuffer.wrap(wire);
+    int checksum = CrcHelper.computeChecksumFromWritten(buffer, 1, wire.length - 3, crcExtra);
+    wire[wire.length - 2] = (byte) checksum;
+    wire[wire.length - 1] = (byte) (checksum >>> 8);
+    return wire;
+  }
+
+  @Test
+  void compiledRegistryPreservesMavlink1BaseFieldLengths() throws Exception {
+    var registry = MavlinkMessageFormatLoader.getInstance().getDialectOrThrow("common").getRegistry();
+    var heartbeat = registry.getCompiledMessagesById().get(0);
+    var commandAck = registry.getCompiledMessagesById().get(77);
+
+    assertEquals(9, heartbeat.getMinimumPayloadSizeBytes());
+    assertEquals(3, commandAck.getMinimumPayloadSizeBytes());
+    assertTrue(commandAck.getPayloadSizeBytes() > commandAck.getMinimumPayloadSizeBytes());
+
+    for (var message : registry.getCompiledMessages()) {
+      int baseLength = message.getCompiledFields().stream()
+          .filter(field -> !field.getFieldDefinition().isExtension())
+          .mapToInt(field -> field.getSizeInBytes())
+          .sum();
+      assertEquals(baseLength, message.getMinimumPayloadSizeBytes(), message.getName());
+    }
+  }
+
   @Test
   void unknownIncompatibilityBitsAndZeroSenderIdsAreRejected() {
     Frame signed = frame(Version.V2, new byte[]{9, 8}, false);
@@ -190,8 +217,9 @@ class MavlinkWireConformanceTest {
     byte[] knownSafe = pack(new FramePacker(DIALECT, null), signed);
     assertEquals(FrameFailureReason.UNSIGNED, handler.tryDecode(ByteBuffer.wrap(knownSafe)).orElseThrow().getValidated());
 
-    signed.setSystemId(0);
-    byte[] invalidSource = pack(new FramePacker(DIALECT, null), signed);
+    byte[] invalidSource = knownSafe.clone();
+    invalidSource[5] = 0;
+    withRecomputedChecksum(invalidSource, DIALECT.crcExtra(Version.V2, signed.getMessageId()));
     assertTrue(handler.tryDecode(ByteBuffer.wrap(invalidSource)).isEmpty());
   }
 
@@ -257,15 +285,19 @@ class MavlinkWireConformanceTest {
 
   @Test
   void mavlink1RejectsZeroSenderIdentities() {
-    Frame zeroSystem = frame(Version.V1, new byte[]{9, 8}, false);
-    zeroSystem.setSystemId(0);
-    byte[] first = pack(new FramePacker(DIALECT, null), zeroSystem);
-    assertTrue(new V1FrameHandler(DIALECT).tryDecode(ByteBuffer.wrap(first)).isEmpty());
+    byte[] valid = pack(new FramePacker(DIALECT, null), frame(Version.V1, new byte[]{9, 8}, false));
+    V1FrameHandler handler = new V1FrameHandler(DIALECT);
+    assertEquals(FrameFailureReason.OK, handler.tryDecode(ByteBuffer.wrap(valid)).orElseThrow().getValidated());
 
-    Frame zeroComponent = frame(Version.V1, new byte[]{9, 8}, false);
-    zeroComponent.setComponentId(0);
-    byte[] second = pack(new FramePacker(DIALECT, null), zeroComponent);
-    assertTrue(new V1FrameHandler(DIALECT).tryDecode(ByteBuffer.wrap(second)).isEmpty());
+    byte[] zeroSystem = valid.clone();
+    zeroSystem[3] = 0;
+    withRecomputedChecksum(zeroSystem, DIALECT.crcExtra(Version.V1, 42));
+    assertTrue(handler.tryDecode(ByteBuffer.wrap(zeroSystem)).isEmpty());
+
+    byte[] zeroComponent = valid.clone();
+    zeroComponent[4] = 0;
+    withRecomputedChecksum(zeroComponent, DIALECT.crcExtra(Version.V1, 42));
+    assertTrue(handler.tryDecode(ByteBuffer.wrap(zeroComponent)).isEmpty());
   }
 
 }
