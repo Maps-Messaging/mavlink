@@ -76,6 +76,10 @@ public final class FramePacker {
     if (frame.getVersion() == null) {
       throw new IllegalArgumentException("frame.version must not be null");
     }
+    if (frame.getSystemId() < 1 || frame.getSystemId() > 255 ||
+        frame.getComponentId() < 1 || frame.getComponentId() > 255) {
+      throw new IllegalArgumentException("MAVLink sender IDs must be between 1 and 255");
+    }
 
     switch (frame.getVersion()) {
       case V1:
@@ -150,7 +154,20 @@ public final class FramePacker {
       wirePayloadLength = 1;
     }
 
+    if (frame.getMessageId() < 0 || frame.getMessageId() > 0xFFFFFF) {
+      throw new IllegalArgumentException("MAVLink 2 message ID must fit in 24 bits");
+    }
+
     boolean signed = frame.isSigned();
+    int linkId = signingConfig.linkId();
+    byte[] signingKey = null;
+    if (signed) {
+      signingKey = signingKeyProvider == null ? null
+          : signingKeyProvider.getSigningKey(frame.getSystemId(), frame.getComponentId(), linkId);
+      if (signingKey == null || signingKey.length != 32) {
+        throw new IllegalArgumentException("Signed v2 frame requires 32-byte signing key");
+      }
+    }
 
     int required = MAVLINK_V2_HEADER_LENGTH + wirePayloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);
     requireRemaining(out, required);
@@ -195,13 +212,6 @@ public final class FramePacker {
 
     byte[] signature = null;
     if (signed) {
-      int linkId = signingConfig.linkId();
-      byte[] signingKey = signingKeyProvider == null ? null
-          : signingKeyProvider.getSigningKey(frame.getSystemId(), frame.getComponentId(), linkId);
-      if (signingKey == null || signingKey.length != 32) {
-        throw new IllegalArgumentException("Signed v2 frame requires 32-byte signing key");
-      }
-
       long timestampTicks = signingConfig.state().nextOutgoing(frame.getSystemId(), frame.getComponentId(), linkId);
       int crcStartIndex = out.position() - CRC_LENGTH;
 
