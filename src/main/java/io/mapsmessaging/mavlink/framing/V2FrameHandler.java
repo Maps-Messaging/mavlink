@@ -25,8 +25,11 @@ import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.Version;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.security.MessageDigest;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class V2FrameHandler implements FrameHandler {
 
@@ -34,13 +37,16 @@ public final class V2FrameHandler implements FrameHandler {
 
   public static final int INCOMPAT_FLAG_SIGNED = 0x01;
 
-  private static final int HEADER_LENGTH = 10; // LEN, INC, COMP, SEQ, SYSID, COMPID, MSGID(3)
+  private static final int HEADER_LENGTH = 10; // STX, LEN, INC, COMP, SEQ, SYSID, COMPID, MSGID(3)
+  private static final long MAVLINK_EPOCH_MILLIS = 1_420_070_400_000L;
+  private static final long MAX_CLOCK_SKEW_TICKS = 6_000_000L;
 
   static final int CRC_LENGTH = 2;
   static final int SIGNATURE_LENGTH = 13;
 
   private final DialectRegistry dialectRegistry;
   private final SigningKeyProvider signingKeyProvider;
+  private final ConcurrentMap<Integer, Long> receivedTimestamps = new ConcurrentHashMap<>();
 
   public V2FrameHandler(DialectRegistry dialectRegistry,
                         SigningKeyProvider signingKeyProvider) {
@@ -50,7 +56,7 @@ public final class V2FrameHandler implements FrameHandler {
 
   @Override
   public int minimumBytesRequiredForHeader() {
-    return 1 + HEADER_LENGTH;
+    return HEADER_LENGTH;
   }
 
   @Override
@@ -81,15 +87,21 @@ public final class V2FrameHandler implements FrameHandler {
 
     byte incompatibilityFlags = candidateFrame.get(frameStartIndex + 2);
     byte compatibilityFlags = candidateFrame.get(frameStartIndex + 3);
+    if (((incompatibilityFlags & 0xFF) & ~INCOMPAT_FLAG_SIGNED) != 0) {
+      return Optional.empty();
+    }
 
     int sequence = candidateFrame.get(frameStartIndex + 4) & 0xFF;
     int systemId = candidateFrame.get(frameStartIndex + 5) & 0xFF;
     int componentId = candidateFrame.get(frameStartIndex + 6) & 0xFF;
 
+    if (systemId == 0 || componentId == 0) {
+      return Optional.empty();
+    }
+
     int messageId = ByteBufferUtils.readUnsigned24BitLittleEndian(candidateFrame, frameStartIndex + 7);
 
-    int minimumPayloadLength = dialectRegistry.minimumPayloadLength(Version.V2, messageId);
-    if (payloadLength < minimumPayloadLength) {
+    if (dialectRegistry.minimumPayloadLength(Version.V2, messageId) == Integer.MAX_VALUE) {
       return Optional.empty();
     }
 
@@ -112,10 +124,7 @@ public final class V2FrameHandler implements FrameHandler {
       if (signed) {
         int signatureStartIndex = crcStartIndex + CRC_LENGTH;
         signature = ByteBufferUtils.copyBytes(candidateFrame, signatureStartIndex, SIGNATURE_LENGTH);
-        if (signingKeyProvider.canValidate() &&
-            !validateSignature(candidateFrame, frameStartIndex, crcStartIndex, systemId, componentId, signature)) {
-          validated = FrameFailureReason.SIGNATURE_FAILED;
-        }
+        validated = validateSignature(candidateFrame, frameStartIndex, crcStartIndex, systemId, componentId, signature);
       }
       else{
         validated = FrameFailureReason.UNSIGNED;
@@ -138,35 +147,52 @@ public final class V2FrameHandler implements FrameHandler {
     return Optional.of(frame);
   }
 
-  private boolean validateSignature(ByteBuffer candidateFrame,
-                                    int frameStartIndex,
-                                    int crcStartIndex,
-                                    int systemId,
-                                    int componentId,
-                                    byte[] receivedSignatureBlock) {
-
+  private FrameFailureReason validateSignature(ByteBuffer candidateFrame,
+                                               int frameStartIndex,
+                                               int crcStartIndex,
+                                               int systemId,
+                                               int componentId,
+                                               byte[] receivedSignatureBlock) {
     if (receivedSignatureBlock == null || receivedSignatureBlock.length != SIGNATURE_LENGTH) {
-      return false;
+      return FrameFailureReason.SIGNATURE_FAILED;
+    }
+    if (signingKeyProvider == null || !signingKeyProvider.canValidate()) {
+      return FrameFailureReason.UNKNOWN;
     }
 
     int linkId = receivedSignatureBlock[0] & 0xFF;
     long timestamp = readUnsigned48BitLittleEndian(receivedSignatureBlock, 1);
 
     byte[] signingKey = signingKeyProvider.getSigningKey(systemId, componentId, linkId);
-    if (signingKey == null || signingKey.length == 0) {
-      return false;
+    if (signingKey == null) {
+      return FrameFailureReason.UNKNOWN;
+    }
+    if (signingKey.length != 32) {
+      return FrameFailureReason.SIGNATURE_FAILED;
     }
 
     byte[] expectedSignatureBlock = V2SignatureGenerator.buildSignature(
-        candidateFrame,
-        frameStartIndex,
-        crcStartIndex,
-        linkId,
-        timestamp,
-        signingKey
-    );
+        candidateFrame, frameStartIndex, crcStartIndex, linkId, timestamp, signingKey);
 
-    return Arrays.equals(expectedSignatureBlock, receivedSignatureBlock);
+    if (!MessageDigest.isEqual(expectedSignatureBlock, receivedSignatureBlock)) {
+      return FrameFailureReason.SIGNATURE_FAILED;
+    }
+
+    long currentTimestamp = Math.max(0L, (System.currentTimeMillis() - MAVLINK_EPOCH_MILLIS) * 100L);
+    if (timestamp < currentTimestamp - MAX_CLOCK_SKEW_TICKS) {
+      return FrameFailureReason.SIGNATURE_FAILED;
+    }
+
+    int streamKey = (systemId << 16) | (componentId << 8) | linkId;
+    AtomicBoolean accepted = new AtomicBoolean();
+    receivedTimestamps.compute(streamKey, (key, previous) -> {
+      if (previous != null && timestamp <= previous) {
+        return previous;
+      }
+      accepted.set(true);
+      return timestamp;
+    });
+    return accepted.get() ? FrameFailureReason.OK : FrameFailureReason.SIGNATURE_FAILED;
   }
 
   private static long readUnsigned48BitLittleEndian(byte[] source, int offset) {
