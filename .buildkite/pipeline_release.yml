@@ -1,6 +1,8 @@
 steps:
   - label: ":maven: Build and Deploy"
     command:
+      - 'case "$BUILDKITE_BRANCH" in release-*) ;; *) echo "Release pipeline requires a release-* branch" >&2; exit 1 ;; esac'
+      - 'if grep -Eq "<version>[^<]*SNAPSHOT</version>" pom.xml; then echo "Refusing to publish a SNAPSHOT as a release" >&2; exit 1; fi'
       - mvn clean deploy -Prelease
     agents:
       queue: "java_build_queue_aws"
