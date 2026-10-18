@@ -243,9 +243,9 @@ public final class MavlinkFrameCodec {
         return Integer.MAX_VALUE; // force failure
       }
 
-      if (version == Version.V1) {
-        return compiled.getPayloadSizeBytes();
-      }
+      // MAVLink 1 transmits the fixed base fields only (never extension fields).
+      // MAVLink 2 may truncate trailing zero bytes below this base length;
+      // its frame handler checks message existence but permits the shorter wire payload.
       return compiled.getMinimumPayloadSizeBytes();
     }
   }
