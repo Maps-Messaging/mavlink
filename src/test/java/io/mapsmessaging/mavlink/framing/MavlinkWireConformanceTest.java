@@ -226,4 +226,33 @@ class MavlinkWireConformanceTest {
     }
   }
 
+  @Test
+  void headerOnlyRoutingMustNotExposeInvalidFrames() throws Exception {
+    var dialect = MavlinkMessageFormatLoader.getInstance().getDialectOrThrow("common");
+    MavlinkFrameCodec defaultCodec = new MavlinkFrameCodec(dialect);
+    Frame unsigned = frame(Version.V2, new byte[]{1, 0, 0}, false);
+    unsigned.setMessageId(77);
+
+    ByteBuffer output = ByteBuffer.allocate(128);
+    defaultCodec.packFrame(output, unsigned);
+    byte[] unsignedWire = Arrays.copyOf(output.array(), output.position());
+    assertTrue(defaultCodec.tryUnpackHeaderAndPayload(ByteBuffer.wrap(unsignedWire)).isPresent());
+
+    byte[] badCrc = unsignedWire.clone();
+    badCrc[badCrc.length - 1] ^= 1;
+    assertTrue(defaultCodec.tryUnpackHeaderAndPayload(ByteBuffer.wrap(badCrc)).isEmpty());
+
+    StaticSigningKeyProvider keyProvider = new StaticSigningKeyProvider(new byte[32]);
+    MavlinkFrameCodec signedCodec = new MavlinkFrameCodec(dialect, keyProvider);
+    Frame signed = frame(Version.V2, new byte[]{1, 0, 0}, true);
+    signed.setMessageId(77);
+    ByteBuffer signedOutput = ByteBuffer.allocate(128);
+    signedCodec.packFrame(signedOutput, signed);
+    byte[] signedWire = Arrays.copyOf(signedOutput.array(), signedOutput.position());
+
+    assertTrue(defaultCodec.tryUnpackHeaderAndPayload(ByteBuffer.wrap(signedWire)).isEmpty());
+    assertTrue(signedCodec.tryUnpackHeaderAndPayload(ByteBuffer.wrap(signedWire)).isPresent());
+    assertTrue(signedCodec.tryUnpackHeaderAndPayload(ByteBuffer.wrap(signedWire)).isEmpty());
+  }
+
 }
