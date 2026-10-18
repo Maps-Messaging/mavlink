@@ -204,9 +204,9 @@ saves outgoing and replay timestamps periodically during activity and on `state.
 File corruption fails closed on load; keep persisted state on stable storage. The caller owns state
 and must close it on shutdown.
 
-`V2FrameSigning.appendSignature` is deprecated because appending raw bytes to an unsigned packet
-cannot update its signed flag and CRC without dialect context. Prefer `FramePacker` or
-`MavlinkFrameCodec.packFrame`.
+MAVLink 2 signing must use `FramePacker` or `MavlinkFrameCodec.packFrame` with
+`Frame.isSigned()` set. Raw signature appending is not supported because updating
+the signed header flag changes the CRC, which depends on the message dialect.
 
 ## License
 

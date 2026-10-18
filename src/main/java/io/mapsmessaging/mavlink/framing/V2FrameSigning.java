@@ -31,50 +31,6 @@ public final class V2FrameSigning {
   private V2FrameSigning() {
   }
 
-  /**
-   * @deprecated Appending bytes to an unsigned packet does not set the signed header flag
-   * or recompute its CRC_EXTRA-dependent checksum. Use FramePacker with Frame.isSigned() instead.
-   * Kept for callers that explicitly require the historical byte-appending behaviour.
-   */
-  @Deprecated(since = "2.0.1", forRemoval = false)
-  public static ByteBuffer appendSignature(ByteBuffer unsignedFrame,
-                                           int linkId,
-                                           long timestamp,
-                                           byte[] signingKey) {
-    if (unsignedFrame == null) {
-      throw new IllegalArgumentException("unsignedFrame must not be null");
-    }
-    if (signingKey == null || signingKey.length != 32) {
-      throw new IllegalArgumentException("signingKey must be 32 bytes");
-    }
-
-    ByteBuffer readOnly = unsignedFrame.duplicate();
-
-    int frameStartIndex = readOnly.position();
-    int frameLimit = readOnly.limit();
-
-    if (frameLimit - frameStartIndex < 1 + 10 + CRC_LENGTH) {
-      throw new IllegalArgumentException("Frame too short");
-    }
-
-    int crcStartIndex = frameLimit - CRC_LENGTH;
-
-    byte[] signatureBlock = V2SignatureGenerator.buildSignature(
-        readOnly,
-        frameStartIndex,
-        crcStartIndex,
-        linkId,
-        timestamp,
-        signingKey
-    );
-
-    ByteBuffer signedFrame = ByteBuffer.allocate((frameLimit - frameStartIndex) + SIGNATURE_LENGTH);
-    signedFrame.put(readOnly.duplicate());
-    signedFrame.put(signatureBlock);
-    signedFrame.flip();
-    return signedFrame;
-  }
-
   public static boolean validateSignature(ByteBuffer signedFrame,
                                           int frameStartIndex,
                                           int crcStartIndex,
