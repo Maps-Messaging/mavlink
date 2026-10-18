@@ -69,6 +69,10 @@ public final class V1FrameHandler implements FrameHandler {
     int sequence = candidateFrame.get(frameStartIndex + 2) & 0xFF;
     int systemId = candidateFrame.get(frameStartIndex + 3) & 0xFF;
     int componentId = candidateFrame.get(frameStartIndex + 4) & 0xFF;
+    if (systemId == 0 || componentId == 0) {
+      return Optional.empty();
+    }
+
     int messageId = candidateFrame.get(frameStartIndex + 5) & 0xFF;
 
     int minimumPayloadLength = dialectRegistry.minimumPayloadLength(Version.V1, messageId);
