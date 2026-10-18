@@ -134,7 +134,7 @@ class MavlinkWireConformanceTest {
     V2FrameHandler handler = new V2FrameHandler(DIALECT, signingKeys);
 
     assertEquals(FrameFailureReason.OK, handler.tryDecode(ByteBuffer.wrap(signed)).orElseThrow().getValidated());
-    assertEquals(FrameFailureReason.SIGNATURE_FAILED, handler.tryDecode(ByteBuffer.wrap(signed)).orElseThrow().getValidated());
+    assertEquals(FrameFailureReason.SIGNATURE_REPLAY, handler.tryDecode(ByteBuffer.wrap(signed)).orElseThrow().getValidated());
     assertEquals(FrameFailureReason.OK, handler.tryDecode(ByteBuffer.wrap(next)).orElseThrow().getValidated());
 
     byte[] tamperedTimestamp = next.clone();
@@ -144,7 +144,7 @@ class MavlinkWireConformanceTest {
 
     byte[] unsigned = pack(new FramePacker(DIALECT, null), frame(Version.V2, new byte[]{9, 8}, false));
     assertEquals(FrameFailureReason.UNSIGNED, handler.tryDecode(ByteBuffer.wrap(unsigned)).orElseThrow().getValidated());
-    assertEquals(FrameFailureReason.UNKNOWN,
+    assertEquals(FrameFailureReason.SIGNATURE_UNVERIFIED,
         new V2FrameHandler(DIALECT, new NoSigningKeyProvider()).tryDecode(ByteBuffer.wrap(signed)).orElseThrow().getValidated());
   }
 
@@ -216,7 +216,7 @@ class MavlinkWireConformanceTest {
         if (result.get() == FrameFailureReason.OK) {
           authenticated++;
         } else {
-          assertEquals(FrameFailureReason.SIGNATURE_FAILED, result.get());
+          assertEquals(FrameFailureReason.SIGNATURE_REPLAY, result.get());
         }
       }
       assertEquals(1, authenticated);
