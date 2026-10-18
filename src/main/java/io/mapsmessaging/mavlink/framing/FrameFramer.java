@@ -22,8 +22,9 @@ package io.mapsmessaging.mavlink.framing;
 
 import io.mapsmessaging.mavlink.message.Frame;
 
-import java.nio.ByteBuffer;
 import io.mapsmessaging.mavlink.signing.MavlinkSigningConfig;
+
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.Optional;
 

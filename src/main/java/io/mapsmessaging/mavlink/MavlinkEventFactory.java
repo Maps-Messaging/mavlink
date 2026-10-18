@@ -80,7 +80,6 @@ public class MavlinkEventFactory {
 
     Frame frame = frameOptional.get();
     FrameFailureReason failureReason = frame.getValidated();
-    Map<String, Object> fields = frameCodec.parsePayload(frame);
 
     String name = "";
     CompiledMessage message = frameCodec.getRegistry().getCompiledMessagesById().get(frame.getMessageId());
@@ -89,6 +88,7 @@ public class MavlinkEventFactory {
     }
 
     if (failureReason == FrameFailureReason.OK || failureReason == FrameFailureReason.UNSIGNED) {
+      Map<String, Object> fields = frameCodec.parsePayload(frame);
       List<Detection> detectionList = systemContextManager.onValidatedFrame(frame, streamName, timestamp);
       return Optional.of(new ProcessedFrame(name, frame, fields, true, detectionList, frameBytes));
     }
