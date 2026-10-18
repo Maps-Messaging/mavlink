@@ -106,7 +106,7 @@ public final class FramePacker {
     out.put(payload, 0, payloadLength);
 
     int crcExtra = dialectRegistry.crcExtra(Version.V1, frame.getMessageId());
-    int checksum = CrcHelper.computeChecksumFromWritten(out, startPosition + 1, MAVLINK_V1_HEADER_LENGTH + payloadLength, crcExtra);
+    int checksum = CrcHelper.computeChecksumFromWritten(out, startPosition + 1, (MAVLINK_V1_HEADER_LENGTH - 1) + payloadLength, crcExtra);
 
     out.put((byte) (checksum & 0xFF));
     out.put((byte) ((checksum >>> 8) & 0xFF));
