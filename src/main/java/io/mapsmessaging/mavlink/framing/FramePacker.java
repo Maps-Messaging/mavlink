@@ -126,15 +126,24 @@ public final class FramePacker {
       throw new IllegalArgumentException("payload length (" + payload.length + ") < payloadLength (" + payloadLength + ")");
     }
 
+    // MAVLink 2 drops trailing zero bytes but always transmits one payload byte.
+    int wirePayloadLength = payloadLength;
+    while (wirePayloadLength > 1 && payload[wirePayloadLength - 1] == 0) {
+      wirePayloadLength--;
+    }
+    if (wirePayloadLength == 0) {
+      wirePayloadLength = 1;
+    }
+
     boolean signed = frame.isSigned();
 
-    int required = 1 + MAVLINK_V2_HEADER_LENGTH + payloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);
+    int required = 1 + MAVLINK_V2_HEADER_LENGTH + wirePayloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);
     requireRemaining(out, required);
 
     int startPosition = out.position();
 
     out.put((byte) MAVLINK_V2_STX);
-    out.put((byte) payloadLength);
+    out.put((byte) wirePayloadLength);
 
     byte incompatibilityFlags = frame.getIncompatibilityFlags();
     if (signed) {
@@ -152,13 +161,17 @@ public final class FramePacker {
 
     writeUnsigned24BitLittleEndian(out, frame.getMessageId());
 
-    out.put(payload, 0, payloadLength);
+    if (payloadLength == 0) {
+      out.put((byte) 0);
+    } else {
+      out.put(payload, 0, wirePayloadLength);
+    }
 
     int crcExtra = dialectRegistry.crcExtra(Version.V2, frame.getMessageId());
     int checksum = CrcHelper.computeChecksumFromWritten(
         out,
         startPosition + 1,
-        (MAVLINK_V2_HEADER_LENGTH - 1) + payloadLength,
+        (MAVLINK_V2_HEADER_LENGTH - 1) + wirePayloadLength,
         crcExtra
     );
 
@@ -190,6 +203,7 @@ public final class FramePacker {
     }
 
     frame.setChecksum(checksum);
+    frame.setPayloadLength(wirePayloadLength);
     frame.setIncompatibilityFlags(incompatibilityFlags);
     frame.setSignature(signature);
     frame.setValidated(FrameFailureReason.OK);
