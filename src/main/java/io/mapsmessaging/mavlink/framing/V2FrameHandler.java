@@ -26,10 +26,9 @@ import io.mapsmessaging.mavlink.message.Version;
 
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import io.mapsmessaging.mavlink.signing.MavlinkSigningConfig;
+import io.mapsmessaging.mavlink.signing.MavlinkSigningPolicy;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class V2FrameHandler implements FrameHandler {
 
@@ -38,20 +37,25 @@ public final class V2FrameHandler implements FrameHandler {
   public static final int INCOMPAT_FLAG_SIGNED = 0x01;
 
   private static final int HEADER_LENGTH = 10; // STX, LEN, INC, COMP, SEQ, SYSID, COMPID, MSGID(3)
-  private static final long MAVLINK_EPOCH_MILLIS = 1_420_070_400_000L;
-  private static final long MAX_CLOCK_SKEW_TICKS = 6_000_000L;
 
   static final int CRC_LENGTH = 2;
   static final int SIGNATURE_LENGTH = 13;
 
   private final DialectRegistry dialectRegistry;
   private final SigningKeyProvider signingKeyProvider;
-  private final ConcurrentMap<Integer, Long> receivedTimestamps = new ConcurrentHashMap<>();
+  private final MavlinkSigningConfig signingConfig;
 
   public V2FrameHandler(DialectRegistry dialectRegistry,
                         SigningKeyProvider signingKeyProvider) {
+    this(dialectRegistry, signingKeyProvider, MavlinkSigningConfig.unsignedDefaults());
+  }
+
+  public V2FrameHandler(DialectRegistry dialectRegistry,
+                        SigningKeyProvider signingKeyProvider,
+                        MavlinkSigningConfig signingConfig) {
     this.dialectRegistry = dialectRegistry;
     this.signingKeyProvider = signingKeyProvider;
+    this.signingConfig = java.util.Objects.requireNonNull(signingConfig, "signingConfig");
   }
 
   @Override
@@ -126,8 +130,9 @@ public final class V2FrameHandler implements FrameHandler {
         signature = ByteBufferUtils.copyBytes(candidateFrame, signatureStartIndex, SIGNATURE_LENGTH);
         validated = validateSignature(candidateFrame, frameStartIndex, crcStartIndex, systemId, componentId, signature);
       }
-      else{
-        validated = FrameFailureReason.UNSIGNED;
+      else {
+        validated = signingConfig.policy() == MavlinkSigningPolicy.REQUIRED
+            ? FrameFailureReason.UNSIGNED_REJECTED : FrameFailureReason.UNSIGNED;
       }
     }
     Frame frame = new Frame();
@@ -157,7 +162,7 @@ public final class V2FrameHandler implements FrameHandler {
       return FrameFailureReason.SIGNATURE_FAILED;
     }
     if (signingKeyProvider == null || !signingKeyProvider.canValidate()) {
-      return FrameFailureReason.UNKNOWN;
+      return FrameFailureReason.SIGNATURE_UNVERIFIED;
     }
 
     int linkId = receivedSignatureBlock[0] & 0xFF;
@@ -165,7 +170,7 @@ public final class V2FrameHandler implements FrameHandler {
 
     byte[] signingKey = signingKeyProvider.getSigningKey(systemId, componentId, linkId);
     if (signingKey == null) {
-      return FrameFailureReason.UNKNOWN;
+      return FrameFailureReason.SIGNATURE_UNVERIFIED;
     }
     if (signingKey.length != 32) {
       return FrameFailureReason.SIGNATURE_FAILED;
@@ -178,21 +183,7 @@ public final class V2FrameHandler implements FrameHandler {
       return FrameFailureReason.SIGNATURE_FAILED;
     }
 
-    long currentTimestamp = Math.max(0L, (System.currentTimeMillis() - MAVLINK_EPOCH_MILLIS) * 100L);
-    if (timestamp < currentTimestamp - MAX_CLOCK_SKEW_TICKS) {
-      return FrameFailureReason.SIGNATURE_FAILED;
-    }
-
-    int streamKey = (systemId << 16) | (componentId << 8) | linkId;
-    AtomicBoolean accepted = new AtomicBoolean();
-    receivedTimestamps.compute(streamKey, (key, previous) -> {
-      if (previous != null && timestamp <= previous) {
-        return previous;
-      }
-      accepted.set(true);
-      return timestamp;
-    });
-    return accepted.get() ? FrameFailureReason.OK : FrameFailureReason.SIGNATURE_FAILED;
+    return signingConfig.state().acceptIncoming(systemId, componentId, linkId, timestamp);
   }
 
   private static long readUnsigned48BitLittleEndian(byte[] source, int offset) {

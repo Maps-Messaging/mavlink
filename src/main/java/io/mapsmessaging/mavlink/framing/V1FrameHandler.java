@@ -26,6 +26,8 @@ import io.mapsmessaging.mavlink.message.Version;
 import io.mapsmessaging.mavlink.message.X25Crc;
 
 import java.nio.ByteBuffer;
+import io.mapsmessaging.mavlink.signing.MavlinkSigningPolicy;
+import java.util.Objects;
 import java.util.Optional;
 
 public final class V1FrameHandler implements FrameHandler {
@@ -36,9 +38,15 @@ public final class V1FrameHandler implements FrameHandler {
   private static final int CRC_LENGTH = 2;
 
   private final DialectRegistry dialectRegistry;
+  private final MavlinkSigningPolicy signingPolicy;
 
   public V1FrameHandler(DialectRegistry dialectRegistry) {
+    this(dialectRegistry, MavlinkSigningPolicy.DISABLED);
+  }
+
+  public V1FrameHandler(DialectRegistry dialectRegistry, MavlinkSigningPolicy signingPolicy) {
     this.dialectRegistry = dialectRegistry;
+    this.signingPolicy = Objects.requireNonNull(signingPolicy, "signingPolicy");
   }
 
   @Override
@@ -87,10 +95,9 @@ public final class V1FrameHandler implements FrameHandler {
 
     int crcExtra = dialectRegistry.crcExtra(Version.V1, messageId);
     int computedChecksum = CrcHelper.computeChecksumFromWritten(candidateFrame, frameStartIndex + 1, (HEADER_LENGTH) + payloadLength-1, crcExtra);
-    FrameFailureReason v = FrameFailureReason.OK;
-    if (computedChecksum != receivedChecksum) {
-      v = FrameFailureReason.CRC_FAILED;
-    }
+    FrameFailureReason v = computedChecksum != receivedChecksum
+        ? FrameFailureReason.CRC_FAILED
+        : signingPolicy == MavlinkSigningPolicy.REQUIRED ? FrameFailureReason.UNSIGNED_REJECTED : FrameFailureReason.OK;
 
     byte[] payload = ByteBufferUtils.copyBytes(candidateFrame, payloadStartIndex, payloadLength);
 

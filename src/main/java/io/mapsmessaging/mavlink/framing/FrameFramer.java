@@ -23,6 +23,8 @@ package io.mapsmessaging.mavlink.framing;
 import io.mapsmessaging.mavlink.message.Frame;
 
 import java.nio.ByteBuffer;
+import io.mapsmessaging.mavlink.signing.MavlinkSigningConfig;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -43,8 +45,14 @@ public final class FrameFramer {
   private final FrameHandler mavlinkV2FrameHandler;
 
   public FrameFramer(DialectRegistry dialectRegistry, SigningKeyProvider signingKeyProvider) {
-    this.mavlinkV1FrameHandler = new V1FrameHandler(dialectRegistry);
-    this.mavlinkV2FrameHandler = new V2FrameHandler(dialectRegistry, signingKeyProvider);
+    this(dialectRegistry, signingKeyProvider, MavlinkSigningConfig.unsignedDefaults());
+  }
+
+  public FrameFramer(DialectRegistry dialectRegistry, SigningKeyProvider signingKeyProvider,
+                     MavlinkSigningConfig signingConfig) {
+    Objects.requireNonNull(signingConfig, "signingConfig");
+    this.mavlinkV1FrameHandler = new V1FrameHandler(dialectRegistry, signingConfig.policy());
+    this.mavlinkV2FrameHandler = new V2FrameHandler(dialectRegistry, signingKeyProvider, signingConfig);
   }
 
   public Optional<Frame> tryDecode(ByteBuffer networkOwnedBuffer) {

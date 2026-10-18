@@ -31,6 +31,12 @@ public final class V2FrameSigning {
   private V2FrameSigning() {
   }
 
+  /**
+   * @deprecated Appending bytes to an unsigned packet does not set the signed header flag
+   * or recompute its CRC_EXTRA-dependent checksum. Use FramePacker with Frame.isSigned() instead.
+   * Kept for callers that explicitly require the historical byte-appending behaviour.
+   */
+  @Deprecated(since = "2.0.1", forRemoval = false)
   public static ByteBuffer appendSignature(ByteBuffer unsignedFrame,
                                            int linkId,
                                            long timestamp,

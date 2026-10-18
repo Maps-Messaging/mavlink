@@ -28,6 +28,7 @@ import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.MessageRegistry;
 import io.mapsmessaging.mavlink.message.Version;
 import io.mapsmessaging.mavlink.signing.NoSigningKeyProvider;
+import io.mapsmessaging.mavlink.signing.MavlinkSigningConfig;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -69,13 +70,23 @@ public final class MavlinkFrameCodec {
    * @param payloadCodec codec providing the dialect name, message registry, and payload encode/decode
    * @throws NullPointerException if {@code payloadCodec} is {@code null}
    */
-  public MavlinkFrameCodec(MavlinkCodec payloadCodec,  SigningKeyProvider signingKeyProvider) {
+  public MavlinkFrameCodec(MavlinkCodec payloadCodec, SigningKeyProvider signingKeyProvider) {
+    this(payloadCodec, signingKeyProvider, MavlinkSigningConfig.unsignedDefaults());
+  }
+
+  /**
+   * Creates a codec using a logical link's signing policy, link ID and shared state.
+   * Pass the same configuration when reconstructing codecs for the same logical link.
+   */
+  public MavlinkFrameCodec(MavlinkCodec payloadCodec, SigningKeyProvider signingKeyProvider,
+                           MavlinkSigningConfig signingConfig) {
     this.payloadCodec = Objects.requireNonNull(payloadCodec, "payloadCodec");
+    Objects.requireNonNull(signingConfig, "signingConfig");
 
     DialectRegistry dialectRegistry = new RegistryAdapter(payloadCodec.getRegistry());
 
-    this.framer = new FrameFramer(dialectRegistry, signingKeyProvider);
-    this.packer = new FramePacker(dialectRegistry, signingKeyProvider);
+    this.framer = new FrameFramer(dialectRegistry, signingKeyProvider, signingConfig);
+    this.packer = new FramePacker(dialectRegistry, signingKeyProvider, signingConfig);
   }
 
   /**
