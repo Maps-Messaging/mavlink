@@ -96,6 +96,7 @@ public class MessageRegistry {
     List<CompiledField> compiledFields = new ArrayList<>();
 
     int currentOffset = 0;
+    int minimumPayloadSize = 0;
     for (FieldDefinition fieldDefinition : messageDefinition.getFields()) {
       AbstractMavlinkFieldCodec fieldCodec = FieldCodecFactory.createCodec(fieldDefinition);
 
@@ -106,11 +107,15 @@ public class MessageRegistry {
       compiledField.setSizeInBytes(fieldCodec.getSizeInBytes());
 
       compiledFields.add(compiledField);
-      currentOffset = currentOffset + fieldCodec.getSizeInBytes();
+      currentOffset += compiledField.getSizeInBytes();
+      if (!fieldDefinition.isExtension()) {
+        minimumPayloadSize += compiledField.getSizeInBytes();
+      }
     }
 
     compiledMessage.setCompiledFields(compiledFields);
     compiledMessage.setPayloadSizeBytes(currentOffset);
+    compiledMessage.setMinimumPayloadSizeBytes(minimumPayloadSize);
 
     return compiledMessage;
   }
