@@ -255,4 +255,17 @@ class MavlinkWireConformanceTest {
     assertTrue(signedCodec.tryUnpackHeaderAndPayload(ByteBuffer.wrap(signedWire)).isEmpty());
   }
 
+  @Test
+  void mavlink1RejectsZeroSenderIdentities() {
+    Frame zeroSystem = frame(Version.V1, new byte[]{9, 8}, false);
+    zeroSystem.setSystemId(0);
+    byte[] first = pack(new FramePacker(DIALECT, null), zeroSystem);
+    assertTrue(new V1FrameHandler(DIALECT).tryDecode(ByteBuffer.wrap(first)).isEmpty());
+
+    Frame zeroComponent = frame(Version.V1, new byte[]{9, 8}, false);
+    zeroComponent.setComponentId(0);
+    byte[] second = pack(new FramePacker(DIALECT, null), zeroComponent);
+    assertTrue(new V1FrameHandler(DIALECT).tryDecode(ByteBuffer.wrap(second)).isEmpty());
+  }
+
 }
