@@ -21,6 +21,7 @@
 package io.mapsmessaging.mavlink.codec;
 
 import io.mapsmessaging.mavlink.MavlinkFrameEnvelope;
+import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.mapsmessaging.mavlink.framing.*;
 import io.mapsmessaging.mavlink.message.CompiledMessage;
 import io.mapsmessaging.mavlink.message.Frame;
@@ -122,6 +123,11 @@ public final class MavlinkFrameCodec {
     }
 
     Frame frame = decoded.get();
+    FrameFailureReason validation = frame.getValidated();
+    if (validation != FrameFailureReason.OK && validation != FrameFailureReason.UNSIGNED) {
+      return Optional.empty();
+    }
+
     byte[] payload = Objects.requireNonNull(frame.getPayload(), "frame.payload");
 
     MavlinkFrameEnvelope envelope = new MavlinkFrameEnvelope(
