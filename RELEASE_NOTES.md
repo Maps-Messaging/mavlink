@@ -150,7 +150,7 @@ Sonar Maven plugin and additional Maven build plugins.
 
 ### Traceability
 
-The `main` → `development` comparison contains **135 commits across 64 changed paths**
+The `main` → `development` comparison contains **135 commits across 61 changed paths**
 before this release-notes commit. Jira keys present in those commit messages are:
 
 | Jira | Scope in this repository | Status |
