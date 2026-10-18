@@ -19,7 +19,7 @@ class FramePackerTest {
 
     @Override
     public int minimumPayloadLength(Version version, int messageId) {
-      return 0;
+      return 2;
     }
   };
 

@@ -98,6 +98,13 @@ public final class FramePacker {
     if (payload.length < payloadLength) {
       throw new IllegalArgumentException("payload length (" + payload.length + ") < payloadLength (" + payloadLength + ")");
     }
+    if (frame.getMessageId() < 0 || frame.getMessageId() > 255) {
+      throw new IllegalArgumentException("MAVLink 1 message ID must fit in 8 bits");
+    }
+    int fixedLength = dialectRegistry.minimumPayloadLength(Version.V1, frame.getMessageId());
+    if (fixedLength == Integer.MAX_VALUE || payloadLength != fixedLength) {
+      throw new IllegalArgumentException("MAVLink 1 requires the fixed base payload length: " + fixedLength);
+    }
 
     int required = MAVLINK_V1_HEADER_LENGTH + payloadLength + CRC_LENGTH;
     requireRemaining(out, required);

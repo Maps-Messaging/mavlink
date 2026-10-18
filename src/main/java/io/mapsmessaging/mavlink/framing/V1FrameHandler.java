@@ -84,7 +84,7 @@ public final class V1FrameHandler implements FrameHandler {
     int messageId = candidateFrame.get(frameStartIndex + 5) & 0xFF;
 
     int minimumPayloadLength = dialectRegistry.minimumPayloadLength(Version.V1, messageId);
-    if (payloadLength < minimumPayloadLength) {
+    if (payloadLength != minimumPayloadLength) {
       return Optional.empty();
     }
 
