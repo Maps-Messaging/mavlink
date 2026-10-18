@@ -25,6 +25,9 @@ import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.Version;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class FramePacker {
 
@@ -40,9 +43,11 @@ public final class FramePacker {
 
   private static final int V2_SIGNATURE_LENGTH = 13;
   private static final int V2_INCOMPAT_FLAG_SIGNED = 0x01;
+  private static final long MAVLINK_EPOCH_MILLIS = 1_420_070_400_000L;
 
   private final DialectRegistry dialectRegistry;
   private final SigningKeyProvider signingKeyProvider;
+  private final ConcurrentMap<Integer, AtomicLong> outboundTimestamps = new ConcurrentHashMap<>();
 
 
   public FramePacker(DialectRegistry dialectRegistry, SigningKeyProvider signingKeyProvider) {
@@ -91,7 +96,7 @@ public final class FramePacker {
       throw new IllegalArgumentException("payload length (" + payload.length + ") < payloadLength (" + payloadLength + ")");
     }
 
-    int required = 1 + MAVLINK_V1_HEADER_LENGTH + payloadLength + CRC_LENGTH;
+    int required = MAVLINK_V1_HEADER_LENGTH + payloadLength + CRC_LENGTH;
     requireRemaining(out, required);
 
     int startPosition = out.position();
@@ -137,7 +142,7 @@ public final class FramePacker {
 
     boolean signed = frame.isSigned();
 
-    int required = 1 + MAVLINK_V2_HEADER_LENGTH + wirePayloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);
+    int required = MAVLINK_V2_HEADER_LENGTH + wirePayloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);
     requireRemaining(out, required);
 
     int startPosition = out.position();
@@ -181,13 +186,13 @@ public final class FramePacker {
     byte[] signature = null;
     if (signed) {
       int linkId = 0;
-      long timestampMicros = System.currentTimeMillis() * 1000L;
-
-      byte[] signingKey = signingKeyProvider.getSigningKey(frame.getSystemId(), frame.getComponentId(), linkId);
+      byte[] signingKey = signingKeyProvider == null ? null
+          : signingKeyProvider.getSigningKey(frame.getSystemId(), frame.getComponentId(), linkId);
       if (signingKey == null || signingKey.length != 32) {
         throw new IllegalArgumentException("Signed v2 frame requires 32-byte signing key");
       }
 
+      long timestampTicks = nextTimestamp(frame.getSystemId(), frame.getComponentId(), linkId);
       int crcStartIndex = out.position() - CRC_LENGTH;
 
       signature = V2SignatureGenerator.buildSignature(
@@ -195,7 +200,7 @@ public final class FramePacker {
           startPosition,
           crcStartIndex,
           linkId,
-          timestampMicros,
+          timestampTicks,
           signingKey
       );
 
@@ -208,6 +213,13 @@ public final class FramePacker {
     frame.setSignature(signature);
     frame.setValidated(FrameFailureReason.OK);
   }
+  private long nextTimestamp(int systemId, int componentId, int linkId) {
+    int senderLink = ((systemId & 0xFF) << 16) | ((componentId & 0xFF) << 8) | linkId;
+    long clockTicks = Math.max(0L, (System.currentTimeMillis() - MAVLINK_EPOCH_MILLIS) * 100L);
+    return outboundTimestamps.computeIfAbsent(senderLink, ignored -> new AtomicLong(-1L))
+        .updateAndGet(previous -> Math.max(clockTicks, previous + 1L));
+  }
+
   private static void requireRemaining(ByteBuffer out, int required) {
     if (out.remaining() < required) {
       throw new IllegalArgumentException("Insufficient space in output buffer. required=" + required + " remaining=" + out.remaining());
