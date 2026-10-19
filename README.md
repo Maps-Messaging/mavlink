@@ -172,6 +172,42 @@ If you want a clean, deterministic payload codec, this is it.
 
 ---
 
+## MAVLink 1/2 Full-Frame Encoding and Signing
+
+The `MavlinkCodec` type handles schema payloads. `MavlinkFrameCodec` additionally handles wire framing,
+CRC validation, MAVLink 1 fixed-size payloads, MAVLink 2 zero-byte truncation, and optional MAVLink 2 signing.
+
+Existing code using `new MavlinkFrameCodec(payloadCodec)` continues to accept unsigned MAVLink 1 and 2
+packets without a signing configuration. Unverified signed packets are **not** treated as authenticated.
+
+To enable signing, configure a stable link ID and a shared signing state for the logical channel:
+
+```java
+SigningStateStore store = new FileSigningStateStore(Path.of("data", "mavlink-signing-state.bin"));
+SigningState state = new SigningState(store);
+MavlinkSigningConfig config = new MavlinkSigningConfig(MavlinkSigningPolicy.OPTIONAL, 7, state);
+MavlinkFrameCodec frames = new MavlinkFrameCodec(payloadCodec, signingKeyProvider, config);
+```
+
+Set `Frame.isSigned()` when sending an authenticated MAVLink 2 frame. The encoder sets the signed
+incompatibility flag, computes CRC over the actual wire payload, and appends the 13-byte signature
+using link ID 7 and a monotonic timestamp. Supply a 32-byte key through the existing
+`SigningKeyProvider`. No signing keys are saved by `SigningStateStore`.
+
+Incoming policy values are `DISABLED` (legacy unsigned default), `OPTIONAL` (unsigned accepted,
+signed packets must authenticate), and `REQUIRED` (only authenticated signed MAVLink 2 accepted).
+The disabled and optional policies both permit unsigned inbound packets; neither treats
+a signed packet with an unknown key as valid. Outbound signing remains controlled by `Frame.isSigned()`.
+
+Reuse `state` across codec/dialect replacements for the same logical link. The optional file-backed store
+saves outgoing and replay timestamps periodically during activity and on `state.close()`.
+File corruption fails closed on load; keep persisted state on stable storage. The caller owns state
+and must close it on shutdown.
+
+MAVLink 2 signing must use `FramePacker` or `MavlinkFrameCodec.packFrame` with
+`Frame.isSigned()` set. Raw signature appending is not supported because updating
+the signed header flag changes the CRC, which depends on the message dialect.
+
 ## License
 
 Apache License 2.0

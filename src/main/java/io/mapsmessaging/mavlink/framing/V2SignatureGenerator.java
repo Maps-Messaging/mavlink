@@ -36,8 +36,14 @@ public final class V2SignatureGenerator {
                                       long timestamp,
                                       byte[] signingKey) {
 
-    if (signingKey == null || signingKey.length == 0) {
-      throw new IllegalArgumentException("signingKey must be provided");
+    if (signingKey == null || signingKey.length != 32) {
+      throw new IllegalArgumentException("signingKey must be 32 bytes");
+    }
+    if (linkId < 0 || linkId > 0xFF) {
+      throw new IllegalArgumentException("linkId must be an unsigned byte");
+    }
+    if (timestamp < 0 || timestamp > 0xFFFFFFFFFFFFL) {
+      throw new IllegalArgumentException("timestamp must be an unsigned 48-bit value");
     }
 
     int packetEndExclusive = crcStartIndex + CRC_LENGTH;
@@ -52,13 +58,12 @@ public final class V2SignatureGenerator {
     readOnly.position(frameStartIndex);
     readOnly.get(packetBytes);
 
-    byte[] digest = sha256(packetBytes, signingKey);
-    byte[] signatureBytes = Arrays.copyOf(digest, 6);
-
     byte[] signatureBlock = new byte[SIGNATURE_LENGTH];
     signatureBlock[0] = (byte) linkId;
-
     writeUnsigned48BitLittleEndian(signatureBlock, 1, timestamp);
+
+    byte[] digest = sha256(packetBytes, signatureBlock, signingKey);
+    byte[] signatureBytes = Arrays.copyOf(digest, 6);
 
     System.arraycopy(signatureBytes, 0, signatureBlock, 7, 6);
     return signatureBlock;
@@ -75,7 +80,7 @@ public final class V2SignatureGenerator {
     target[offset + 5] = (byte) (masked >>> 40);
   }
 
-  private static byte[] sha256(byte[] packetBytes, byte[] signingKey) {
+  private static byte[] sha256(byte[] packetBytes, byte[] signatureBlock, byte[] signingKey) {
     MessageDigest digest;
     try {
       digest = MessageDigest.getInstance("SHA-256");
@@ -83,8 +88,9 @@ public final class V2SignatureGenerator {
       throw new IllegalStateException("SHA-256 not available", e);
     }
 
-    digest.update(packetBytes);
     digest.update(signingKey);
+    digest.update(packetBytes);
+    digest.update(signatureBlock, 0, 7);
     return digest.digest();
   }
 

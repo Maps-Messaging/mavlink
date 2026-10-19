@@ -38,6 +38,22 @@ public class Int8FieldCodec extends AbstractMavlinkFieldCodec {
   @Override
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
-    buffer.put(((Number) value).byteValue());
+    buffer.put(toByte(value));
+  }
+
+  private byte toByte(Object value) {
+    if (value instanceof Number number) {
+      return number.byteValue();
+    }
+
+    if (value instanceof String stringValue) {
+      try {
+        return Byte.parseByte(stringValue);
+      } catch (NumberFormatException exception) {
+        throw new IllegalArgumentException("Unable to encode INT8 field from value: " + stringValue, exception);
+      }
+    }
+
+    throw new IllegalArgumentException("Unable to encode INT8 field from value type " + value.getClass().getName());
   }
 }

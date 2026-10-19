@@ -38,6 +38,23 @@ public class FloatFieldCodec extends AbstractMavlinkFieldCodec {
   @Override
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
-    buffer.putFloat(((Number) value).floatValue());
+    buffer.putFloat(toFloat(value));
+  }
+
+  private float toFloat(Object value) {
+    if (value instanceof Number number) {
+      return number.floatValue();
+    }
+
+    if (value instanceof String stringValue) {
+      return switch (stringValue) {
+        case "NaN" -> Float.NaN;
+        case "Infinity" -> Float.POSITIVE_INFINITY;
+        case "-Infinity" -> Float.NEGATIVE_INFINITY;
+        default -> Float.parseFloat(stringValue);
+      };
+    }
+
+    throw new IllegalArgumentException("Unable to encode FLOAT field from value type " + value.getClass().getName());
   }
 }

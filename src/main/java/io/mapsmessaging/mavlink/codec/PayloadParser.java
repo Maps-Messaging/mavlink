@@ -53,10 +53,15 @@ public class PayloadParser {
 
     Map<String, Object> result = new HashMap<>();
 
-    ByteBuffer buffer = ByteBuffer.wrap(payload);
-    buffer.order(ByteOrder.LITTLE_ENDIAN);
+    // MAVLink 2 omits trailing zero bytes, including bytes within scalar fields.
+    // Restore the full wire layout before decoding, without changing the supplied payload.
+    int decodedLength = 0;
+    for (CompiledField compiledField : compiledMessage.getCompiledFields()) {
+      decodedLength += compiledField.getSizeInBytes();
+    }
 
-    boolean truncated = false;
+    byte[] paddedPayload = java.util.Arrays.copyOf(payload, Math.max(decodedLength, payload.length));
+    ByteBuffer buffer = ByteBuffer.wrap(paddedPayload).order(ByteOrder.LITTLE_ENDIAN);
 
     for (CompiledField compiledField : compiledMessage.getCompiledFields()) {
       FieldDefinition fieldDefinition = compiledField.getFieldDefinition();
@@ -64,21 +69,12 @@ public class PayloadParser {
       String fieldName = fieldDefinition.getName();
       int fieldSize = compiledField.getSizeInBytes();
 
-      if (!fieldDefinition.isExtension()) {
-        if (truncated || buffer.remaining() < fieldSize) {
-          truncated = true;
-          result.put(fieldName, zeroValue(fieldDefinition));
-          continue;
-        }
-      } else {
-        // Extension fields: absent if not enough bytes (or if we've already truncated)
-        if (truncated || buffer.remaining() < fieldSize) {
-          result.put(fieldName, null);
-          continue;
-        }
+      if (fieldDefinition.isExtension() && buffer.position() >= payload.length) {
+        result.put(fieldName, null);
+        buffer.position(buffer.position() + fieldSize);
+        continue;
       }
 
-      // Normal decode path (enough bytes available)
       if (!fieldDefinition.isArray()) {
         result.put(fieldName, fieldCodec.decode(buffer));
         continue;
@@ -86,7 +82,6 @@ public class PayloadParser {
 
       int len = fieldDefinition.getArrayLength();
       if (fieldDefinition.getWireType() == WireType.CHAR) {
-        // read fixed-size char[N] bytes; codec may or may not do this correctly
         byte[] raw = new byte[len];
         buffer.get(raw);
         int end = 0;
@@ -104,34 +99,6 @@ public class PayloadParser {
     }
 
     return result;
-  }
-
-  private Object zeroValue(FieldDefinition fieldDefinition) {
-    if (!fieldDefinition.isArray()) {
-      // Scalars: 0 / 0.0 / false, etc.
-      return switch (fieldDefinition.getWireType()) {
-        case FLOAT, DOUBLE -> 0.0;
-        case CHAR -> ""; // should never happen for non-array in MAVLink, but safe
-        default -> 0L;   // ints: you can use Long universally in your map
-      };
-    }
-
-    int len = fieldDefinition.getArrayLength();
-
-    if (fieldDefinition.getWireType() == WireType.CHAR) {
-      return "";
-    }
-
-    // Numeric arrays: list of zeros
-    List<Object> zeros = new ArrayList<>(len);
-    Object z = switch (fieldDefinition.getWireType()) {
-      case FLOAT, DOUBLE -> 0.0;
-      default -> 0L;
-    };
-    for (int i = 0; i < len; i++) {
-      zeros.add(z);
-    }
-    return zeros;
   }
 
 }

@@ -20,7 +20,6 @@
 
 package io.mapsmessaging.mavlink.message.fields;
 
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -39,6 +38,22 @@ public class Int32FieldCodec extends AbstractMavlinkFieldCodec {
   @Override
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
-    buffer.putInt(((Number) value).intValue());
+    buffer.putInt(toInt(value));
+  }
+
+  private int toInt(Object value) {
+    if (value instanceof Number number) {
+      return number.intValue();
+    }
+
+    if (value instanceof String stringValue) {
+      try {
+        return Integer.parseInt(stringValue);
+      } catch (NumberFormatException exception) {
+        throw new IllegalArgumentException("Unable to encode INT32 field from value: " + stringValue, exception);
+      }
+    }
+
+    throw new IllegalArgumentException("Unable to encode INT32 field from value type " + value.getClass().getName());
   }
 }

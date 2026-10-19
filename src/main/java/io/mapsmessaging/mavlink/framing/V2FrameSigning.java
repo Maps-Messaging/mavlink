@@ -21,7 +21,7 @@
 package io.mapsmessaging.mavlink.framing;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.security.MessageDigest;
 
 import static io.mapsmessaging.mavlink.framing.V2FrameHandler.CRC_LENGTH;
 import static io.mapsmessaging.mavlink.framing.V2FrameHandler.SIGNATURE_LENGTH;
@@ -29,44 +29,6 @@ import static io.mapsmessaging.mavlink.framing.V2FrameHandler.SIGNATURE_LENGTH;
 public final class V2FrameSigning {
 
   private V2FrameSigning() {
-  }
-
-  public static ByteBuffer appendSignature(ByteBuffer unsignedFrame,
-                                           int linkId,
-                                           long timestamp,
-                                           byte[] signingKey) {
-    if (unsignedFrame == null) {
-      throw new IllegalArgumentException("unsignedFrame must not be null");
-    }
-    if (signingKey == null || signingKey.length != 32) {
-      throw new IllegalArgumentException("signingKey must be 32 bytes");
-    }
-
-    ByteBuffer readOnly = unsignedFrame.duplicate();
-
-    int frameStartIndex = readOnly.position();
-    int frameLimit = readOnly.limit();
-
-    if (frameLimit - frameStartIndex < 1 + 10 + CRC_LENGTH) {
-      throw new IllegalArgumentException("Frame too short");
-    }
-
-    int crcStartIndex = frameLimit - CRC_LENGTH;
-
-    byte[] signatureBlock = V2SignatureGenerator.buildSignature(
-        readOnly,
-        frameStartIndex,
-        crcStartIndex,
-        linkId,
-        timestamp,
-        signingKey
-    );
-
-    ByteBuffer signedFrame = ByteBuffer.allocate((frameLimit - frameStartIndex) + SIGNATURE_LENGTH);
-    signedFrame.put(readOnly.duplicate());
-    signedFrame.put(signatureBlock);
-    signedFrame.flip();
-    return signedFrame;
   }
 
   public static boolean validateSignature(ByteBuffer signedFrame,
@@ -96,7 +58,7 @@ public final class V2FrameSigning {
         signingKey
     );
 
-    return Arrays.equals(expectedSignatureBlock, receivedSignatureBlock);
+    return MessageDigest.isEqual(expectedSignatureBlock, receivedSignatureBlock);
   }
 
   private static long readUnsigned48BitLittleEndian(byte[] source, int offset) {

@@ -38,6 +38,22 @@ public class Int64FieldCodec extends AbstractMavlinkFieldCodec {
   @Override
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
-    buffer.putLong(((Number) value).longValue());
+    buffer.putLong(toLong(value));
+  }
+
+  private long toLong(Object value) {
+    if (value instanceof Number number) {
+      return number.longValue();
+    }
+
+    if (value instanceof String stringValue) {
+      try {
+        return Long.parseLong(stringValue);
+      } catch (NumberFormatException exception) {
+        throw new IllegalArgumentException("Unable to encode INT64 field from value: " + stringValue, exception);
+      }
+    }
+
+    throw new IllegalArgumentException("Unable to encode INT64 field from value type " + value.getClass().getName());
   }
 }

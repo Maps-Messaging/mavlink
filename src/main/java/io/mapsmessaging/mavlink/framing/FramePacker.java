@@ -25,6 +25,7 @@ import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.Version;
 
 import java.nio.ByteBuffer;
+import io.mapsmessaging.mavlink.signing.MavlinkSigningConfig;
 
 public final class FramePacker {
 
@@ -43,11 +44,18 @@ public final class FramePacker {
 
   private final DialectRegistry dialectRegistry;
   private final SigningKeyProvider signingKeyProvider;
+  private final MavlinkSigningConfig signingConfig;
 
 
   public FramePacker(DialectRegistry dialectRegistry, SigningKeyProvider signingKeyProvider) {
+    this(dialectRegistry, signingKeyProvider, MavlinkSigningConfig.unsignedDefaults());
+  }
+
+  public FramePacker(DialectRegistry dialectRegistry, SigningKeyProvider signingKeyProvider,
+                     MavlinkSigningConfig signingConfig) {
     this.dialectRegistry = dialectRegistry;
     this.signingKeyProvider = signingKeyProvider;
+    this.signingConfig = java.util.Objects.requireNonNull(signingConfig, "signingConfig");
   }
 
   /**
@@ -67,6 +75,10 @@ public final class FramePacker {
 
     if (frame.getVersion() == null) {
       throw new IllegalArgumentException("frame.version must not be null");
+    }
+    if (frame.getSystemId() < 1 || frame.getSystemId() > 255 ||
+        frame.getComponentId() < 1 || frame.getComponentId() > 255) {
+      throw new IllegalArgumentException("MAVLink sender IDs must be between 1 and 255");
     }
 
     switch (frame.getVersion()) {
@@ -90,8 +102,15 @@ public final class FramePacker {
     if (payload.length < payloadLength) {
       throw new IllegalArgumentException("payload length (" + payload.length + ") < payloadLength (" + payloadLength + ")");
     }
+    if (frame.getMessageId() < 0 || frame.getMessageId() > 255) {
+      throw new IllegalArgumentException("MAVLink 1 message ID must fit in 8 bits");
+    }
+    int fixedLength = dialectRegistry.minimumPayloadLength(Version.V1, frame.getMessageId());
+    if (fixedLength == Integer.MAX_VALUE || payloadLength != fixedLength) {
+      throw new IllegalArgumentException("MAVLink 1 requires the fixed base payload length: " + fixedLength);
+    }
 
-    int required = 1 + MAVLINK_V1_HEADER_LENGTH + payloadLength + CRC_LENGTH;
+    int required = MAVLINK_V1_HEADER_LENGTH + payloadLength + CRC_LENGTH;
     requireRemaining(out, required);
 
     int startPosition = out.position();
@@ -106,7 +125,7 @@ public final class FramePacker {
     out.put(payload, 0, payloadLength);
 
     int crcExtra = dialectRegistry.crcExtra(Version.V1, frame.getMessageId());
-    int checksum = CrcHelper.computeChecksumFromWritten(out, startPosition + 1, MAVLINK_V1_HEADER_LENGTH + payloadLength, crcExtra);
+    int checksum = CrcHelper.computeChecksumFromWritten(out, startPosition + 1, (MAVLINK_V1_HEADER_LENGTH - 1) + payloadLength, crcExtra);
 
     out.put((byte) (checksum & 0xFF));
     out.put((byte) ((checksum >>> 8) & 0xFF));
@@ -126,15 +145,37 @@ public final class FramePacker {
       throw new IllegalArgumentException("payload length (" + payload.length + ") < payloadLength (" + payloadLength + ")");
     }
 
-    boolean signed = frame.isSigned();
+    // MAVLink 2 drops trailing zero bytes but always transmits one payload byte.
+    int wirePayloadLength = payloadLength;
+    while (wirePayloadLength > 1 && payload[wirePayloadLength - 1] == 0) {
+      wirePayloadLength--;
+    }
+    if (wirePayloadLength == 0) {
+      wirePayloadLength = 1;
+    }
 
-    int required = 1 + MAVLINK_V2_HEADER_LENGTH + payloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);
+    if (frame.getMessageId() < 0 || frame.getMessageId() > 0xFFFFFF) {
+      throw new IllegalArgumentException("MAVLink 2 message ID must fit in 24 bits");
+    }
+
+    boolean signed = frame.isSigned();
+    int linkId = signingConfig.linkId();
+    byte[] signingKey = null;
+    if (signed) {
+      signingKey = signingKeyProvider == null ? null
+          : signingKeyProvider.getSigningKey(frame.getSystemId(), frame.getComponentId(), linkId);
+      if (signingKey == null || signingKey.length != 32) {
+        throw new IllegalArgumentException("Signed v2 frame requires 32-byte signing key");
+      }
+    }
+
+    int required = MAVLINK_V2_HEADER_LENGTH + wirePayloadLength + CRC_LENGTH + (signed ? V2_SIGNATURE_LENGTH : 0);
     requireRemaining(out, required);
 
     int startPosition = out.position();
 
     out.put((byte) MAVLINK_V2_STX);
-    out.put((byte) payloadLength);
+    out.put((byte) wirePayloadLength);
 
     byte incompatibilityFlags = frame.getIncompatibilityFlags();
     if (signed) {
@@ -152,13 +193,17 @@ public final class FramePacker {
 
     writeUnsigned24BitLittleEndian(out, frame.getMessageId());
 
-    out.put(payload, 0, payloadLength);
+    if (payloadLength == 0) {
+      out.put((byte) 0);
+    } else {
+      out.put(payload, 0, wirePayloadLength);
+    }
 
     int crcExtra = dialectRegistry.crcExtra(Version.V2, frame.getMessageId());
     int checksum = CrcHelper.computeChecksumFromWritten(
         out,
         startPosition + 1,
-        (MAVLINK_V2_HEADER_LENGTH - 1) + payloadLength,
+        (MAVLINK_V2_HEADER_LENGTH - 1) + wirePayloadLength,
         crcExtra
     );
 
@@ -167,14 +212,7 @@ public final class FramePacker {
 
     byte[] signature = null;
     if (signed) {
-      int linkId = 0;
-      long timestampMicros = System.currentTimeMillis() * 1000L;
-
-      byte[] signingKey = signingKeyProvider.getSigningKey(frame.getSystemId(), frame.getComponentId(), linkId);
-      if (signingKey == null || signingKey.length != 32) {
-        throw new IllegalArgumentException("Signed v2 frame requires 32-byte signing key");
-      }
-
+      long timestampTicks = signingConfig.state().nextOutgoing(frame.getSystemId(), frame.getComponentId(), linkId);
       int crcStartIndex = out.position() - CRC_LENGTH;
 
       signature = V2SignatureGenerator.buildSignature(
@@ -182,7 +220,7 @@ public final class FramePacker {
           startPosition,
           crcStartIndex,
           linkId,
-          timestampMicros,
+          timestampTicks,
           signingKey
       );
 
@@ -190,6 +228,7 @@ public final class FramePacker {
     }
 
     frame.setChecksum(checksum);
+    frame.setPayloadLength(wirePayloadLength);
     frame.setIncompatibilityFlags(incompatibilityFlags);
     frame.setSignature(signature);
     frame.setValidated(FrameFailureReason.OK);

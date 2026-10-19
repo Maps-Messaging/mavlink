@@ -38,6 +38,29 @@ public class DoubleFieldCodec extends AbstractMavlinkFieldCodec {
   @Override
   public void encode(ByteBuffer buffer, Object value) {
     buffer.order(ByteOrder.LITTLE_ENDIAN);
-    buffer.putDouble(((Number) value).doubleValue());
+    buffer.putDouble(toDouble(value));
+  }
+
+  private double toDouble(Object value) {
+    if (value instanceof Number number) {
+      return number.doubleValue();
+    }
+
+    if (value instanceof String stringValue) {
+      return switch (stringValue) {
+        case "NaN" -> Double.NaN;
+        case "Infinity" -> Double.POSITIVE_INFINITY;
+        case "-Infinity" -> Double.NEGATIVE_INFINITY;
+        default -> {
+          try {
+            yield Double.parseDouble(stringValue);
+          } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Unable to encode DOUBLE field from value: " + stringValue, exception);
+          }
+        }
+      };
+    }
+
+    throw new IllegalArgumentException("Unable to encode DOUBLE field from value type " + value.getClass().getName());
   }
 }

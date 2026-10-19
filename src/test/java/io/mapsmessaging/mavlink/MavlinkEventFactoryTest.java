@@ -116,7 +116,7 @@ class MavlinkEventFactoryTest {
     int systemId = 9;
 
     when(frameCodec.tryUnpackFrame(payload)).thenReturn(Optional.of(frame));
-    when(frameCodec.parsePayload(frame)).thenReturn(Map.of("shouldNot", "matter"));
+    // An unauthenticated frame must never be passed to the payload decoder.
     when(frameCodec.getRegistry()).thenReturn(registry);
 
     when(frame.getMessageId()).thenReturn(messageId);
@@ -148,5 +148,6 @@ class MavlinkEventFactoryTest {
     verify(systemContextManager, times(1))
         .onInvalidFrame(eq(systemId), eq("streamA"), anyLong(), eq(FrameFailureReason.CRC_FAILED));
     verify(systemContextManager, never()).onValidatedFrame(any(), anyString(), anyLong());
+    verify(frameCodec, never()).parsePayload(frame);
   }
 }

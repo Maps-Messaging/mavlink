@@ -21,12 +21,14 @@
 package io.mapsmessaging.mavlink.codec;
 
 import io.mapsmessaging.mavlink.MavlinkFrameEnvelope;
+import io.mapsmessaging.mavlink.context.FrameFailureReason;
 import io.mapsmessaging.mavlink.framing.*;
 import io.mapsmessaging.mavlink.message.CompiledMessage;
 import io.mapsmessaging.mavlink.message.Frame;
 import io.mapsmessaging.mavlink.message.MessageRegistry;
 import io.mapsmessaging.mavlink.message.Version;
 import io.mapsmessaging.mavlink.signing.NoSigningKeyProvider;
+import io.mapsmessaging.mavlink.signing.MavlinkSigningConfig;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -68,13 +70,23 @@ public final class MavlinkFrameCodec {
    * @param payloadCodec codec providing the dialect name, message registry, and payload encode/decode
    * @throws NullPointerException if {@code payloadCodec} is {@code null}
    */
-  public MavlinkFrameCodec(MavlinkCodec payloadCodec,  SigningKeyProvider signingKeyProvider) {
+  public MavlinkFrameCodec(MavlinkCodec payloadCodec, SigningKeyProvider signingKeyProvider) {
+    this(payloadCodec, signingKeyProvider, MavlinkSigningConfig.unsignedDefaults());
+  }
+
+  /**
+   * Creates a codec using a logical link's signing policy, link ID and shared state.
+   * Pass the same configuration when reconstructing codecs for the same logical link.
+   */
+  public MavlinkFrameCodec(MavlinkCodec payloadCodec, SigningKeyProvider signingKeyProvider,
+                           MavlinkSigningConfig signingConfig) {
     this.payloadCodec = Objects.requireNonNull(payloadCodec, "payloadCodec");
+    Objects.requireNonNull(signingConfig, "signingConfig");
 
     DialectRegistry dialectRegistry = new RegistryAdapter(payloadCodec.getRegistry());
 
-    this.framer = new FrameFramer(dialectRegistry, signingKeyProvider);
-    this.packer = new FramePacker(dialectRegistry, signingKeyProvider);
+    this.framer = new FrameFramer(dialectRegistry, signingKeyProvider, signingConfig);
+    this.packer = new FramePacker(dialectRegistry, signingKeyProvider, signingConfig);
   }
 
   /**
@@ -122,6 +134,11 @@ public final class MavlinkFrameCodec {
     }
 
     Frame frame = decoded.get();
+    FrameFailureReason validation = frame.getValidated();
+    if (validation != FrameFailureReason.OK && validation != FrameFailureReason.UNSIGNED) {
+      return Optional.empty();
+    }
+
     byte[] payload = Objects.requireNonNull(frame.getPayload(), "frame.payload");
 
     MavlinkFrameEnvelope envelope = new MavlinkFrameEnvelope(
@@ -243,9 +260,9 @@ public final class MavlinkFrameCodec {
         return Integer.MAX_VALUE; // force failure
       }
 
-      if (version == Version.V1) {
-        return compiled.getPayloadSizeBytes();
-      }
+      // MAVLink 1 transmits the fixed base fields only (never extension fields).
+      // MAVLink 2 may truncate trailing zero bytes below this base length;
+      // its frame handler checks message existence but permits the shorter wire payload.
       return compiled.getMinimumPayloadSizeBytes();
     }
   }
