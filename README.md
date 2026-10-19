@@ -1,27 +1,43 @@
-# MAVLink Java Codec, Framing and Telemetry
+# MAVLink Payload Codec (Java)
 
-[Release notes for version 3.0.0](RELEASE_NOTES.md)
+This repository provides a lightweight, schema-driven MAVLink **payload**
+encoder and decoder for Java.
 
-This Java library parses MAVLink XML dialects and provides MAVLink 1 and MAVLink 2 payload codecs, full-frame encoding and decoding, CRC validation, optional MAVLink 2 signing and replay protection, and telemetry `.tlog` recording. It is transport-independent: applications supply their own serial, UDP or TCP connection.
+It parses MAVLink XML dialects (including `{@code <include>}` handling),
+compiles message definitions, and provides fast, thread-safe encoding and
+decoding of MAVLink message **payloads only**.
 
-**Java:** 17 or newer.
+This library is intentionally limited in scope and designed to be composed
+into larger MAVLink-capable systems.
 
-### Maven dependency
+---
 
-```xml
-<dependency>
-  <groupId>io.mapsmessaging</groupId>
-  <artifactId>mavlink</artifactId>
-  <version>3.0.0</version>
-</dependency>
-```
+## Scope (Read This First)
 
-### Upgrade from 2.x
+This library operates **only on MAVLink message payloads**.
 
-Version 3.0.0 intentionally removes `V2FrameSigning.appendSignature(...)`. Applications signing MAVLink 2 packets must use `MavlinkFrameCodec.packFrame(...)` or `FramePacker.pack(...)` with `Frame.isSigned(true)` and an appropriate signing key. See the [3.0.0 release notes](RELEASE_NOTES.md) for details.
+It **does**:
 
-The default codec configuration continues to support unsigned MAVLink 1 and MAVLink 2 traffic.
+- Parse MAVLink XML dialects
+- Compile message definitions into an immutable registry
+- Encode Java field maps into MAVLink payload bytes
+- Decode MAVLink payload bytes into typed field maps
+- Correctly handle MAVLink field ordering, arrays, enums, and extensions
 
+It **does not**:
+
+- Manage system IDs, component IDs, or sequence numbers
+- Implement any transport (UART, UDP, TCP, etc.)
+
+Frame parsing, CRC handling, and framing are provided by the framework layer
+built on top of this codec.
+
+- Manage system IDs, component IDs, or sequence numbers
+- Implement any transport (UART, UDP, TCP, etc.)
+
+Whant to know more?
+ 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Maps-Messaging/mavlink)
 ---
 
 ## Features
@@ -34,7 +50,7 @@ The default codec configuration continues to support unsigned MAVLink 1 and MAVL
 - Array fields and `char[]` handling
 - Enum and bitmask enum resolution
 - Safe failure on invalid or truncated payloads
-- Immutable compiled dialects; explicit per-link state for signing and telemetry logging
+- No shared mutable state at runtime
 
 ---
 
@@ -128,13 +144,13 @@ All parsing and encoding errors are reported explicitly:
 - Invalid enum values → `IOException`
 - Truncated or malformed payloads → `IOException`
 
-Callers should handle the documented checked exceptions and validate external inputs; invalid arguments may also produce unchecked exceptions.
+No unchecked exceptions escape payload encode/decode paths.
 
 ---
 
 ## Design Philosophy
 
-- Payload and wire-frame processing without transport assumptions
+- Payloads only, no transport assumptions
 - Compile once, run fast
 - Immutability over defensive copying
 - Explicit errors over silent failure
@@ -151,7 +167,8 @@ This library is intended for:
 - Telemetry ingestion pipelines
 - MAVLink-aware tooling that does not want transport coupling
 
-This library focuses on codec, framing, signing and telemetry-log functionality; applications remain responsible for transport and higher-level vehicle/session management.
+If you want a full MAVLink stack, use something else.  
+If you want a clean, deterministic payload codec, this is it.
 
 ---
 
