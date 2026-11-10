@@ -71,7 +71,10 @@ public final class EnumResolver {
         throw new IOException(
             "Unknown enum value '" + s + "' for enum '" + enumName + "'");
       }
-      return field.getType().startsWith("uint64_t") ? entry.getValue() : (int) entry.getValue();
+      if (field.getType().startsWith("uint64_t")) {
+        return entry.getValue();
+      }
+      return (int) entry.getValue();
     }
 
     if (field.getType().startsWith("uint64_t") && value instanceof List<?> values) {
