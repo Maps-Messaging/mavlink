@@ -59,6 +59,9 @@ public final class EnumResolver {
     }
 
     if (value instanceof Number n) {
+      if (field.getType().startsWith("uint64_t")) {
+        return n;
+      }
       return n.intValue();
     }
 
@@ -68,7 +71,28 @@ public final class EnumResolver {
         throw new IOException(
             "Unknown enum value '" + s + "' for enum '" + enumName + "'");
       }
+      if (field.getType().startsWith("uint64_t")) {
+        return entry.getValue();
+      }
       return (int) entry.getValue();
+    }
+
+    if (field.getType().startsWith("uint64_t") && value instanceof List<?> values) {
+      List<Object> result = new ArrayList<>(values.size());
+      for (Object element : values) {
+        if (element instanceof Number number) {
+          result.add(number);
+        } else if (element instanceof String name) {
+          EnumEntry entry = enumDef.getByName(name);
+          if (entry == null) {
+            throw new IOException("Unknown enum value '" + name + "' for enum '" + enumName + "'");
+          }
+          result.add(entry.getValue());
+        } else {
+          throw new IOException("Invalid uint64_t enum array element for field '" + field.getName() + "'");
+        }
+      }
+      return result;
     }
 
     if (value instanceof Object[] arr) {
